@@ -1,0 +1,176 @@
+import React, { useState } from 'react';
+import { Member, PrayerRequest, ChurchTenant } from '../types';
+import { exportDataAsJson, exportMembersToCsv, resetAllDataToDefault } from '../utils/storage';
+import { Download, Database, RotateCcw, FileSpreadsheet, X, Check, Printer } from 'lucide-react';
+
+interface ExportImportModalProps {
+  isOpen: boolean;
+  currentChurch?: ChurchTenant;
+  members?: Member[];
+  prayers?: PrayerRequest[];
+  onClose: () => void;
+  onResetData: () => void;
+}
+
+export const ExportImportModal: React.FC<ExportImportModalProps> = ({
+  isOpen,
+  currentChurch,
+  members = [],
+  prayers = [],
+  onClose,
+  onResetData
+}) => {
+  const [copied, setCopied] = useState(false);
+
+  if (!isOpen) return null;
+
+  const safeMembers = members || [];
+  const safePrayers = prayers || [];
+
+  const handleDownloadCsv = () => {
+    const csvContent = exportMembersToCsv(safeMembers);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${(currentChurch?.name || 'Church').replace(/\s+/g, '_')}_Member_Directory_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadJsonBackup = () => {
+    const jsonStr = exportDataAsJson();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${(currentChurch?.name || 'Church').replace(/\s+/g, '_')}_Backup_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrintDirectory = () => {
+    window.print();
+  };
+
+  const handleReset = () => {
+    if (confirm(`Are you sure you want to restore the default records for ${currentChurch?.name || 'this church'}? Any custom records added will be replaced with defaults.`)) {
+      resetAllDataToDefault();
+      onResetData();
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-slate-900 text-white p-5 flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-full bg-white p-0.5 overflow-hidden border border-amber-400 shrink-0">
+              <img 
+                src={currentChurch?.logoUrl?.trim() || "/church_logo.jpg"} 
+                alt="Church Logo" 
+                className="w-full h-full object-cover rounded-full"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.endsWith('/church_logo.jpg')) {
+                    target.src = '/church_logo.jpg';
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <h2 className="text-base font-bold">Data Management & Directory Export</h2>
+              <p className="text-[11px] text-slate-400">{currentChurch?.name || 'New Creation Assembly Church'}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-slate-800 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Options Body */}
+        <div className="p-5 space-y-4 text-xs sm:text-sm text-slate-700">
+          <p className="text-slate-600">
+            Easily backup your church directory, export member contacts to Excel CSV, or print a physical membership sheet.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Export CSV */}
+            <button
+              onClick={handleDownloadCsv}
+              className="p-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-2xl flex flex-col items-start gap-2 text-left transition shadow-xs group"
+            >
+              <div className="flex items-center justify-between w-full">
+                <FileSpreadsheet className="w-6 h-6 text-emerald-600 group-hover:scale-110 transition" />
+                <Download className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <span className="font-bold block text-sm">Export Members CSV</span>
+                <span className="text-xs text-emerald-700/80">Compatible with Excel, Google Sheets, & MailChimp</span>
+              </div>
+            </button>
+
+            {/* Download JSON Backup */}
+            <button
+              onClick={handleDownloadJsonBackup}
+              className="p-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-300 rounded-2xl flex flex-col items-start gap-2 text-left transition shadow-xs group"
+            >
+              <div className="flex items-center justify-between w-full">
+                <Database className="w-6 h-6 text-indigo-600 group-hover:scale-110 transition" />
+                <Download className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div>
+                <span className="font-bold block text-sm">Full App JSON Backup</span>
+                <span className="text-xs text-indigo-700/80">Includes members, prayer requests & service rosters</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Print Directory Button */}
+          <button
+            onClick={handlePrintDirectory}
+            className="w-full p-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-300 rounded-2xl flex items-center justify-center gap-2 transition"
+          >
+            <Printer className="w-4 h-4 text-slate-600" />
+            <span>Print Membership Directory Sheet</span>
+          </button>
+
+          {/* Reset to Initial Sample Data */}
+          <div className="pt-4 border-t border-slate-200">
+            <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+              <div>
+                <span className="font-bold text-rose-900 text-xs block">Restore Sample Data</span>
+                <span className="text-[11px] text-rose-700/90 block">Resets members and prayers back to initial defaults.</span>
+              </div>
+              <button
+                onClick={handleReset}
+                className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1 shrink-0 transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restore</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,267 @@
+{
+  "entities": {
+    "churches": {
+      "title": "Church Tenants",
+      "description": "Multi-tenant church organization profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "pastorName": { "type": "string" }
+      },
+      "required": ["id", "name", "code"]
+    },
+    "users": {
+      "title": "SaaS Users & Logins",
+      "description": "User accounts with roles and church affiliations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["id", "church_id", "username", "role"]
+    },
+    "members": {
+      "title": "Church Members",
+      "description": "Directory of church members and leaders per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" },
+        "joinedDate": { "type": "string" }
+      },
+      "required": ["id", "church_id", "firstName", "lastName", "status"]
+    },
+    "prayers": {
+      "title": "Prayer Requests",
+      "description": "Church prayer wall requests per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "memberName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "prayerCount": { "type": "number" },
+        "dateSubmitted": { "type": "string" }
+      },
+      "required": ["id", "church_id", "title", "description"]
+    },
+    "roster": {
+      "title": "Ministry Roster",
+      "description": "Volunteer schedule assignments per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "memberId": { "type": "string" },
+        "team": { "type": "string" },
+        "roleName": { "type": "string" },
+        "serviceDate": { "type": "string" }
+      },
+      "required": ["id", "church_id", "memberId", "serviceDate"]
+    },
+    "events": {
+      "title": "Church Events",
+      "description": "Calendar events and services per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "location": { "type": "string" }
+      },
+      "required": ["id", "church_id", "title", "date"]
+    },
+    "announcements": {
+      "title": "Pastor Announcements",
+      "description": "Church news broadcasts per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "church_id", "title", "content"]
+    },
+    "attendance": {
+      "title": "Attendance Records",
+      "description": "Service attendance logs per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "churchId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "date": { "type": "string" },
+        "presentMemberIds": { "type": "array", "items": { "type": "string" } },
+        "guestCount": { "type": "number" },
+        "notes": { "type": "string" },
+        "recordedBy": { "type": "string" }
+      },
+      "required": ["id", "church_id", "serviceName", "date"]
+    },
+    "notifications": {
+      "title": "Member Notifications",
+      "description": "Church notifications and broadcasts per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "read": { "type": "boolean" },
+        "linkTab": { "type": "string" }
+      },
+      "required": ["id", "church_id", "title", "message"]
+    },
+    "sundayschool_classes": {
+      "title": "Sunday School Classes",
+      "description": "Children's ministry class groups per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "className": { "type": "string" },
+        "ageGroup": { "type": "string" },
+        "teacherName": { "type": "string" }
+      },
+      "required": ["id", "church_id", "className"]
+    },
+    "sundayschool_students": {
+      "title": "Sunday School Students",
+      "description": "Enrolled children per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "classId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "age": { "type": "number" }
+      },
+      "required": ["id", "church_id", "classId", "studentName"]
+    },
+    "whatsapp_templates": {
+      "title": "WhatsApp Message Templates",
+      "description": "Pastoral messaging templates per church",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "templateText": { "type": "string" }
+      },
+      "required": ["id", "church_id", "title", "templateText"]
+    },
+    "church_settings": {
+      "title": "Church Settings",
+      "description": "Custom services, tiers, themes, and configuration per church",
+      "type": "object",
+      "properties": {
+        "churchId": { "type": "string" },
+        "churchName": { "type": "string" }
+      },
+      "required": ["churchId"]
+    },
+    "ministries": {
+      "title": "Ministries",
+      "description": "Church ministry departments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "church_id", "name"]
+    },
+    "ministry_members": {
+      "title": "Ministry Members",
+      "description": "Members assigned to ministries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "ministryId": { "type": "string" },
+        "memberId": { "type": "string" }
+      },
+      "required": ["id", "church_id", "ministryId", "memberId"]
+    },
+    "ministry_teams": {
+      "title": "Ministry Teams",
+      "description": "Sub-teams within ministries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "ministryId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "church_id", "ministryId", "name"]
+    },
+    "ministry_team_members": {
+      "title": "Ministry Team Members",
+      "description": "Members assigned to specific ministry teams",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "teamId": { "type": "string" },
+        "memberId": { "type": "string" }
+      },
+      "required": ["id", "church_id", "teamId", "memberId"]
+    },
+    "ministry_activities": {
+      "title": "Ministry Activities",
+      "description": "Scheduled activities and events for ministries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "ministryId": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "church_id", "ministryId", "title"]
+    },
+    "ministry_announcements": {
+      "title": "Ministry Announcements",
+      "description": "Announcements targeted to specific ministries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "church_id": { "type": "string" },
+        "ministryId": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "church_id", "ministryId", "title"]
+    },
+    "system_meta": {
+      "title": "System Metadata",
+      "description": "System initialization and seed flags",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "seeded": { "type": "boolean" }
+      },
+      "required": ["id"]
+    }
+  }
+}

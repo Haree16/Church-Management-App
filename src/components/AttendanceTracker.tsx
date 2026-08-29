@@ -1,0 +1,373 @@
+import React, { useState } from 'react';
+import { Member, AttendanceRecord, SaaSUser, CompleteChurchSettings } from '../types';
+import { Users, Calendar, CheckCircle2, Circle, UserCheck, Plus, Sparkles, Clock, BarChart3, Save, Trash2 } from 'lucide-react';
+
+interface AttendanceTrackerProps {
+  members?: Member[];
+  attendanceRecords?: AttendanceRecord[];
+  currentUser?: SaaSUser;
+  churchSettings?: CompleteChurchSettings;
+  onSaveRecord: (record: AttendanceRecord) => void;
+  onDeleteRecord?: (id: string) => void;
+}
+
+export const AttendanceTracker: React.FC<AttendanceTrackerProps> = ({
+  members = [],
+  attendanceRecords = [],
+  currentUser,
+  churchSettings,
+  onSaveRecord,
+  onDeleteRecord,
+}) => {
+  const customServices = (churchSettings?.services || []).filter(s => s.isActive !== false).map(s => s.name);
+  const fallbackServices = [
+    'Sunday First Service (9:00 AM)',
+    'Sunday Second Service (10:45 AM)',
+    'Wednesday Word & Prayer (7:00 PM)',
+    'Friday Night Youth Fellowship (7:30 PM)',
+    'Saturday Morning Intercession (8:00 AM)'
+  ];
+  const servicesList = customServices.length > 0 ? customServices : fallbackServices;
+
+  const [selectedService, setSelectedService] = useState(servicesList[0] || 'Sunday Service');
+  const [serviceDate, setServiceDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [presentIds, setPresentIds] = useState<string[]>([]);
+  const [guestCount, setGuestCount] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [recorderName, setRecorderName] = useState(currentUser?.name || 'Church Usher / Leader');
+  const [activeTab, setActiveTab] = useState<'take' | 'history'>('take');
+  const [filterQuery, setFilterQuery] = useState('');
+
+  const safeMembers = members || [];
+  const safeRecords = attendanceRecords || [];
+
+  const toggleMemberPresence = (id: string) => {
+    setPresentIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllMembers = () => {
+    setPresentIds(safeMembers.map((m) => m.id));
+  };
+
+  const clearAllPresence = () => {
+    setPresentIds([]);
+  };
+
+  const handleSaveAttendance = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newRecord: AttendanceRecord = {
+      id: `att-${Date.now()}`,
+      date: serviceDate,
+      serviceName: selectedService,
+      presentMemberIds: presentIds,
+      guestCount,
+      notes,
+      recordedBy: recorderName,
+    };
+    onSaveRecord(newRecord);
+    alert(`Attendance saved successfully! Total present: ${presentIds.length + guestCount}`);
+    setNotes('');
+  };
+
+  const filteredMembers = safeMembers
+    .filter((m) =>
+      `${m.firstName || ''} ${m.lastName || ''} ${m.status || ''} ${m.id || ''}`.toLowerCase().includes(filterQuery.toLowerCase())
+    )
+    .sort((a, b) => String(a.id || '').localeCompare(String(b.id || ''), undefined, { numeric: true, sensitivity: 'base' }));
+
+  const totalMembersCount = safeMembers.length;
+  const recentTotalAttendance = safeRecords.reduce((acc, curr) => acc + (curr.presentMemberIds?.length || 0) + (curr.guestCount || 0), 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-3xl p-5 sm:p-7 shadow-xl relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-3 border border-emerald-500/30">
+              <UserCheck className="w-3.5 h-3.5" />
+              Member & Visitor Attendance Module
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Church Attendance & Fellowship Logs
+            </h2>
+            <p className="text-emerald-100/80 text-sm mt-1 max-w-xl">
+              Track Sunday worship, midweek prayer, and youth service headcounts to shepherd every member and follow up with visitors.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+            <div className="text-center px-3 border-r border-white/20">
+              <p className="text-2xl font-black text-amber-400">{totalMembersCount}</p>
+              <p className="text-[11px] text-slate-300 font-medium">Registered Members</p>
+            </div>
+            <div className="text-center px-3">
+              <p className="text-2xl font-black text-emerald-400">{attendanceRecords.length}</p>
+              <p className="text-[11px] text-slate-300 font-medium">Recorded Services</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar scrollbar-none">
+        <button
+          onClick={() => setActiveTab('take')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition ${
+            activeTab === 'take'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <UserCheck className="w-4 h-4" />
+          Mark Today's Service
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition ${
+            activeTab === 'history'
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Attendance History & Reports ({attendanceRecords.length})
+        </button>
+      </div>
+
+      {activeTab === 'take' ? (
+        <form onSubmit={handleSaveAttendance} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Service Config Panel */}
+          <div className="lg:col-span-1 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-600" />
+              Service Information
+            </h3>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Select Service / Gathering</label>
+              <select
+                value={selectedService}
+                onChange={(e) => setSelectedService(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {servicesList.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={serviceDate}
+                onChange={(e) => setServiceDate(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">First-Time Visitors / Guests Count</label>
+              <input
+                type="number"
+                min="0"
+                value={guestCount}
+                onChange={(e) => setGuestCount(parseInt(e.target.value) || 0)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Recorded By</label>
+              <input
+                type="text"
+                value={recorderName}
+                onChange={(e) => setRecorderName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Service Pastoral Notes</label>
+              <textarea
+                rows={3}
+                placeholder="Key highlights, testimonies, or visitor follow-ups..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+              <div className="flex justify-between items-center text-sm font-bold text-emerald-950">
+                <span>Present Members:</span>
+                <span className="text-emerald-700">{presentIds.length}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm font-bold text-emerald-950 mt-1">
+                <span>Guests / Visitors:</span>
+                <span className="text-amber-700">{guestCount}</span>
+              </div>
+              <div className="border-t border-emerald-200/80 my-2 pt-2 flex justify-between items-center text-base font-extrabold text-emerald-900">
+                <span>Total Attendance:</span>
+                <span className="text-emerald-600">{presentIds.length + guestCount}</span>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+            >
+              <Save className="w-4 h-4" />
+              Save Attendance Record
+            </button>
+          </div>
+
+          {/* Member Roll Call List */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-600" />
+                Member Roll Call ({presentIds.length} of {members.length} checked)
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllMembers}
+                  className="text-xs font-semibold text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+                >
+                  Mark All
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAllPresence}
+                  className="text-xs font-semibold text-slate-600 hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200"
+                >
+                  Uncheck All
+                </button>
+              </div>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Search member name or status..."
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1">
+              {filteredMembers.map((m) => {
+                const isPresent = presentIds.includes(m.id);
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => toggleMemberPresence(m.id)}
+                    className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                      isPresent
+                        ? 'bg-emerald-50/80 border-emerald-300 shadow-sm'
+                        : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
+                        {m.avatarUrl && m.avatarUrl.trim() ? (
+                          <img src={m.avatarUrl.trim()} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-bold text-slate-600 text-xs">
+                            {m.firstName[0]}{m.lastName[0]}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">{m.firstName} {m.lastName}</p>
+                        <span className="text-[10px] text-slate-500 px-1.5 py-0.5 rounded bg-slate-200/60 font-medium">
+                          {m.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      {isPresent ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-slate-300" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </form>
+      ) : (
+        /* History Tab */
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h3 className="text-base font-bold text-slate-900 mb-2">Past Service Records</h3>
+          {safeRecords.length === 0 ? (
+            <p className="text-sm text-slate-500">No attendance logs recorded yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {safeRecords.map((rec) => {
+                const memberCount = (rec.presentMemberIds || []).length;
+                const guestCount = rec.guestCount || 0;
+                return (
+                  <div key={rec.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                          {rec.date}
+                        </span>
+                        <h4 className="text-sm font-bold text-slate-900">{rec.serviceName}</h4>
+                      </div>
+                      {rec.notes && <p className="text-xs text-slate-600 mt-1">{rec.notes}</p>}
+                      <p className="text-[11px] text-slate-400 mt-1">Recorded by: {rec.recordedBy}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-xl border border-slate-200">
+                        <div className="text-center">
+                          <p className="text-xs text-slate-500 font-semibold">Members</p>
+                          <p className="text-base font-extrabold text-slate-900">{memberCount}</p>
+                        </div>
+                        <div className="text-center border-l border-slate-200 pl-4">
+                          <p className="text-xs text-slate-500 font-semibold">Guests</p>
+                          <p className="text-base font-extrabold text-amber-600">{guestCount}</p>
+                        </div>
+                        <div className="text-center border-l border-slate-200 pl-4">
+                          <p className="text-xs text-slate-500 font-semibold">Total</p>
+                          <p className="text-base font-black text-emerald-600">
+                            {memberCount + guestCount}
+                          </p>
+                        </div>
+                      </div>
+
+                      {onDeleteRecord && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete the attendance record for "${rec.serviceName}" on ${rec.date}?`)) {
+                              onDeleteRecord(rec.id);
+                            }
+                          }}
+                          className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-200 transition"
+                          title="Delete this attendance entry"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};

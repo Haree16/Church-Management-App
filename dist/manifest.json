@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest.json",
+  "id": "/",
+  "name": "New Creation Assembly Church",
+  "short_name": "New Creation",
+  "description": "Mobile church member directory, prayer wall, and volunteer ministry rosters for New Creation Assembly Church.",
+  "lang": "en-US",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["lifestyle", "utilities", "social"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Member Directory",
+      "short_name": "Directory",
+      "description": "Search and view church members",
+      "url": "/?tab=members",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Prayer Requests",
+      "short_name": "Prayers",
+      "description": "View and submit prayer requests",
+      "url": "/?tab=prayers",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Volunteer Roster",
+      "short_name": "Roster",
+      "description": "View ministry volunteer schedules",
+      "url": "/?tab=volunteer",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
