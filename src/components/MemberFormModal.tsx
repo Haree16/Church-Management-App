@@ -4,6 +4,7 @@ import {
   X, Plus, Trash2, Save, User, ShieldCheck, HeartHandshake,
   Upload, Camera, Image as ImageIcon, Sparkles, RefreshCw, Check, Link as LinkIcon, CheckCircle2
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface MemberFormModalProps {
   isOpen: boolean;
@@ -42,17 +43,6 @@ const ALL_AVAILABILITY: AvailabilityDay[] = [
   'Wednesday Evening',
   'Saturday Events',
   'On-Call / As Needed'
-];
-
-const MEMBER_AVATAR_PRESETS = [
-  { label: 'Pastor / Elder', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Ministry Leader', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Worship Lead', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Sunday School', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Deacon / Staff', url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Sister / Member', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Youth Leader', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Family Brother', url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80' },
 ];
 
 /**
@@ -384,10 +374,14 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-2 text-center">
-                    <div className="w-10 h-10 rounded-full bg-amber-200/80 text-amber-900 flex items-center justify-center font-black text-sm mb-1">
-                      {initials}
-                    </div>
+                  <div className="flex flex-col items-center justify-center p-2 text-center w-full h-full">
+                    <UserAvatar
+                      name={`${firstName} ${lastName}`.trim() || 'Member'}
+                      avatarUrl={null}
+                      size="lg"
+                      shape="rounded"
+                      className="mb-1"
+                    />
                     <span className="text-[10px] font-bold text-amber-800 flex items-center gap-0.5">
                       <Upload className="w-3 h-3" /> Upload
                     </span>
@@ -448,20 +442,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setShowPresetPicker(!showPresetPicker);
-                      setShowUrlInput(false);
-                    }}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs flex items-center gap-1.5 transition"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Choose Preset</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
                       setShowUrlInput(!showUrlInput);
-                      setShowPresetPicker(false);
                     }}
                     className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs flex items-center gap-1.5 transition"
                   >
@@ -486,52 +467,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                     </button>
                   )}
                 </div>
-
-                {/* Preset Avatar Selection Grid */}
-                {showPresetPicker && (
-                  <div className="bg-white p-3 rounded-xl border border-amber-300 shadow-sm space-y-2 mt-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-700">Select an Avatar Preset:</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowPresetPicker(false)}
-                        className="text-slate-400 hover:text-slate-600 text-xs"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                      {MEMBER_AVATAR_PRESETS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setAvatarUrl(preset.url);
-                            setShowPresetPicker(false);
-                            setUploadSuccessMsg(`Applied preset: ${preset.label}`);
-                            setTimeout(() => setUploadSuccessMsg(''), 3000);
-                          }}
-                          className={`group relative rounded-xl overflow-hidden border-2 transition ${
-                            avatarUrl === preset.url ? 'border-amber-500 ring-2 ring-amber-400' : 'border-slate-200 hover:border-amber-400'
-                          }`}
-                          title={preset.label}
-                        >
-                          <img
-                            src={preset.url}
-                            alt={preset.label}
-                            className="w-full h-12 object-cover group-hover:scale-105 transition"
-                            referrerPolicy="no-referrer"
-                          />
-                          {avatarUrl === preset.url && (
-                            <div className="absolute inset-0 bg-amber-500/30 flex items-center justify-center">
-                              <Check className="w-4 h-4 text-white drop-shadow" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Custom URL Input */}
                 {showUrlInput && (

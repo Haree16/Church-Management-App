@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { ROLE_CONFIGS } from '../utils/rbac';
 import { UserManagementModule } from './UserManagementModule';
+import { UserAvatar } from './common/UserAvatar';
 
 interface SaaSConsoleProps {
   churches?: ChurchTenant[];
@@ -136,7 +137,7 @@ export const SaaSConsole: React.FC<SaaSConsoleProps> = ({
       email: newUserEmail.trim() || `${newUsername.trim()}@church.org`,
       phone: newUserPhone.trim() || '+91 90000 11111',
       role: newUserRole,
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'
+      avatarUrl: ''
     };
 
     handleUserSave(user);
@@ -289,11 +290,12 @@ export const SaaSConsole: React.FC<SaaSConsoleProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            <img
-              src={currentUser.avatarUrl?.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
-              alt={currentUser.name}
-              className="w-12 h-12 rounded-2xl object-cover border border-indigo-200 shrink-0"
-              referrerPolicy="no-referrer"
+            <UserAvatar
+              name={currentUser.name}
+              avatarUrl={currentUser.avatarUrl}
+              size="lg"
+              shape="rounded"
+              border="border border-indigo-200 shadow-sm"
             />
             <div>
               <h3 className="text-base font-bold text-slate-900">{currentUser.name}</h3>
@@ -383,18 +385,13 @@ export const SaaSConsole: React.FC<SaaSConsoleProps> = ({
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  {usr.avatarUrl && usr.avatarUrl.trim() ? (
-                    <img
-                      src={usr.avatarUrl.trim()}
-                      alt={usr.name}
-                      className="w-11 h-11 rounded-xl object-cover shrink-0 border border-slate-300"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center justify-center border border-indigo-200 shrink-0">
-                      {usr.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
-                    </div>
-                  )}
+                  <UserAvatar
+                    name={usr.name}
+                    avatarUrl={usr.avatarUrl}
+                    size="md"
+                    shape="rounded"
+                    border="border border-slate-300"
+                  />
                   <div className="overflow-hidden">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="text-xs font-extrabold truncate">{usr.name}</p>

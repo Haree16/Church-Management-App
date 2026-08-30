@@ -5,6 +5,7 @@ import {
   X, Share2, Download, Trash2, AlertTriangle, Edit3, Save, Eye,
   FileText, Check, Tag
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface EventCalendarProps {
   events?: ChurchEvent[];
@@ -446,11 +447,14 @@ END:VCALENDAR`;
                     {viewingAttendingMembers.map((m) => (
                       <div
                         key={m.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800"
                       >
-                        <div className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center font-bold">
-                          {m.firstName.charAt(0)}
-                        </div>
+                        <UserAvatar
+                          name={`${m.firstName} ${m.lastName}`}
+                          avatarUrl={m.avatarUrl}
+                          size="xs"
+                          shape="circle"
+                        />
                         <span>{m.firstName} {m.lastName}</span>
                         <span className="text-[10px] text-slate-400 font-normal">({m.phone})</span>
                       </div>

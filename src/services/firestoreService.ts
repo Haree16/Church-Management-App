@@ -244,13 +244,60 @@ export async function saveChurchSettingsToFirestore(settings: CompleteChurchSett
   await setDoc(doc(db, CHURCH_SETTINGS_COL, churchId), cleanForFirestore(settings), { merge: true });
 }
 
+const REMOVED_MOCK_USER_IDS = new Set([
+  'user-admin',
+  'user-pastor-samuel',
+  'user-pastor-john',
+  'user-grace-teacher',
+  'user-rajesh-leader',
+  'user-priya-treasurer',
+  'user-anitha-member',
+  'user-thomas-volunteer',
+  'user-pastor-david',
+  'user-pastor-mathew',
+]);
+
+const REMOVED_MOCK_USERNAMES = new Set([
+  'admin',
+  'pastor.samuel',
+  'pastor.john',
+  'grace.teacher',
+  'rajesh.leader',
+  'priya.treasurer',
+  'anitha.member',
+  'thomas.volunteer',
+  'pastor.david',
+  'pastor.mathew',
+]);
+
+const REMOVED_MOCK_MEMBER_IDS = new Set([
+  'mem-1',
+  'mem-2',
+  'mem-3',
+  'mem-4',
+  'mem-5',
+  'mem-gwc-1',
+  'mem-crc-1',
+]);
+
 // USERS
 export function subscribeUsers(onUpdate: (data: SaaSUser[]) => void): () => void {
   return onSnapshot(collection(db, USERS_COL), (snapshot) => {
     const list: SaaSUser[] = [];
-    snapshot.forEach((d) => list.push(d.data() as SaaSUser));
+    snapshot.forEach((d) => {
+      const u = d.data() as SaaSUser;
+      if (
+        REMOVED_MOCK_USER_IDS.has(d.id) ||
+        REMOVED_MOCK_USER_IDS.has(u.id) ||
+        REMOVED_MOCK_USERNAMES.has(u.username?.toLowerCase())
+      ) {
+        deleteUserFromFirestore(d.id).catch(console.warn);
+        return;
+      }
+      list.push(u);
+    });
 
-    // Ensure all standard initial users (especially superadmin) always exist
+    // Ensure superadmin always exists
     INITIAL_SAAS_USERS.forEach((initUser) => {
       if (!list.some((u) => u.username.toLowerCase() === initUser.username.toLowerCase())) {
         list.unshift(initUser);
@@ -281,6 +328,10 @@ export function subscribeMembers(onUpdate: (members: Member[]) => void): () => v
     const members: Member[] = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as Member;
+      if (REMOVED_MOCK_MEMBER_IDS.has(docSnap.id) || REMOVED_MOCK_MEMBER_IDS.has(data.id)) {
+        deleteMemberFromFirestore(docSnap.id).catch(console.warn);
+        return;
+      }
       members.push({ ...data, id: docSnap.id || data.id });
     });
     members.sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
@@ -307,6 +358,14 @@ export function subscribePrayers(onUpdate: (prayers: PrayerRequest[]) => void): 
     const prayers: PrayerRequest[] = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data() as PrayerRequest;
+      if (
+        ['pray-1', 'pray-2', 'pray-3', 'pray-gwc-1'].includes(docSnap.id) ||
+        ['pray-1', 'pray-2', 'pray-3', 'pray-gwc-1'].includes(data.id) ||
+        REMOVED_MOCK_MEMBER_IDS.has(data.memberId || '')
+      ) {
+        deletePrayerFromFirestore(docSnap.id).catch(console.warn);
+        return;
+      }
       prayers.push({ ...data, id: docSnap.id || data.id });
     });
     prayers.sort((a, b) => {

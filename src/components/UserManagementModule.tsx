@@ -8,6 +8,7 @@ import {
   ExternalLink, ChevronRight, X, Upload, Camera
 } from 'lucide-react';
 import { ROLE_CONFIGS, RoleConfig } from '../utils/rbac';
+import { UserAvatar } from './common/UserAvatar';
 
 interface UserManagementModuleProps {
   churches?: ChurchTenant[];
@@ -19,16 +20,6 @@ interface UserManagementModuleProps {
   onSwitchUser: (user: SaaSUser) => void;
   onSelectChurch?: (church: ChurchTenant) => void;
 }
-
-const AVATAR_PRESETS = [
-  { label: 'Senior Pastor', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80' },
-  { label: 'Admin Leader', url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80' },
-  { label: 'Teacher / Lead', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80' },
-  { label: 'Worship Leader', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80' },
-  { label: 'Church Office', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80' },
-  { label: 'Youth Member', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80' },
-  { label: 'Ministry Volunteer', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80' },
-];
 
 export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
   churches = [],
@@ -73,7 +64,7 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
   const [formDesignation, setFormDesignation] = useState('');
   const [formRole, setFormRole] = useState<SaaSUserRole>('Member');
   const [formChurchId, setFormChurchId] = useState<string>(currentChurch?.id || 'church-1');
-  const [formAvatarUrl, setFormAvatarUrl] = useState<string>(AVATAR_PRESETS[0].url);
+  const [formAvatarUrl, setFormAvatarUrl] = useState<string>('');
   const [formStatus, setFormStatus] = useState<'Active' | 'Suspended'>('Active');
   const userFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingUserPhoto, setIsUploadingUserPhoto] = useState(false);
@@ -157,7 +148,7 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
     const safeRole = (!isSuperAdmin && defaultRole === 'SuperAdmin') ? 'PastorAdmin' : defaultRole;
     setFormRole(safeRole);
     setFormChurchId(isSuperAdmin ? (defaultChurchId || safeChurches[0]?.id || 'church-1') : (currentChurch?.id || 'church-1'));
-    setFormAvatarUrl(AVATAR_PRESETS[Math.floor(Math.random() * AVATAR_PRESETS.length)].url);
+    setFormAvatarUrl('');
     setFormStatus('Active');
     setFormError(null);
     setIsModalOpen(true);
@@ -174,7 +165,7 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
     setFormDesignation(user.designation || '');
     setFormRole(user.role);
     setFormChurchId(isSuperAdmin ? (user.church_id || user.churchId || 'church-1') : (currentChurch?.id || 'church-1'));
-    setFormAvatarUrl(user.avatarUrl || AVATAR_PRESETS[0].url);
+    setFormAvatarUrl(user.avatarUrl || '');
     setFormStatus(user.status || 'Active');
     setFormError(null);
     setIsModalOpen(true);
@@ -566,17 +557,18 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <img
-                          src={user.avatarUrl?.trim() || AVATAR_PRESETS[0].url}
-                          alt={user.name}
-                          className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-100 shadow-sm shrink-0"
-                          referrerPolicy="no-referrer"
-                        />
-                        {isCurrentUser && (
-                          <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></span>
-                        )}
-                      </div>
+                      <UserAvatar
+                        name={user.name}
+                        avatarUrl={user.avatarUrl}
+                        size="lg"
+                        shape="rounded"
+                        border="border-2 border-white shadow-sm"
+                        indicator={
+                          isCurrentUser ? (
+                            <span className="w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full block"></span>
+                          ) : undefined
+                        }
+                      />
 
                       <div className="overflow-hidden">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -720,11 +712,12 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
                     <tr key={user.id} className="hover:bg-slate-50/80 transition">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={user.avatarUrl?.trim() || AVATAR_PRESETS[0].url}
-                            alt={user.name}
-                            className="w-10 h-10 rounded-xl object-cover border border-slate-200"
-                            referrerPolicy="no-referrer"
+                          <UserAvatar
+                            name={user.name}
+                            avatarUrl={user.avatarUrl}
+                            size="md"
+                            shape="rounded"
+                            border="border border-slate-200"
                           />
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -1038,13 +1031,14 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
                   <div className="relative shrink-0">
-                    <img
-                      src={formAvatarUrl?.trim() || AVATAR_PRESETS[0].url}
-                      alt="Preview"
-                      className="w-12 h-12 rounded-2xl object-cover border-2 border-amber-500 shadow-sm"
-                      referrerPolicy="no-referrer"
+                    <UserAvatar
+                      name={formName || 'User'}
+                      avatarUrl={formAvatarUrl}
+                      size="lg"
+                      shape="rounded"
+                      border="border-2 border-amber-500 shadow-sm"
                     />
                     {isUploadingUserPhoto && (
                       <div className="absolute inset-0 bg-slate-900/60 rounded-2xl flex items-center justify-center">
@@ -1053,19 +1047,17 @@ export const UserManagementModule: React.FC<UserManagementModuleProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 flex-1">
-                    {AVATAR_PRESETS.map((preset, idx) => (
-                      <img
-                        key={idx}
-                        src={preset.url}
-                        alt={preset.label}
-                        title={preset.label}
-                        onClick={() => setFormAvatarUrl(preset.url)}
-                        className={`w-9 h-9 rounded-xl object-cover cursor-pointer border-2 transition shrink-0 ${
-                          formAvatarUrl === preset.url ? 'border-amber-500 scale-105 shadow-md' : 'border-slate-200 opacity-60 hover:opacity-100'
-                        }`}
-                      />
-                    ))}
+                  <div className="flex-1 text-xs text-slate-600 flex items-center justify-between">
+                    <span>{formAvatarUrl?.trim() ? 'Custom photo attached' : 'Default initials avatar will be generated'}</span>
+                    {formAvatarUrl?.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setFormAvatarUrl('')}
+                        className="px-2 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold"
+                      >
+                        Remove Photo
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

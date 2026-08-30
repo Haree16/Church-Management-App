@@ -178,11 +178,7 @@ export const memberService = {
       last_name: payload.last_name,
       display_name: `${payload.first_name} ${payload.last_name}`.trim(),
       phone: payload.phone || null,
-      avatar_url:
-        payload.avatar_url ||
-        (payload.gender === 'female'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'),
+      avatar_url: payload.avatar_url || null,
       gender: payload.gender || 'other',
       dob: payload.dob || null,
       address: payload.address || null,

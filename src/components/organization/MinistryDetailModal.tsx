@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UserAvatar } from '../common/UserAvatar';
 import {
   Layers,
   Users,
@@ -318,17 +319,13 @@ export function MinistryDetailModal({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {ministry.leader?.avatar_url ? (
-                        <img
-                          src={ministry.leader.avatar_url}
-                          alt={ministry.leader.display_name || 'Leader'}
-                          className="h-12 w-12 rounded-full object-cover ring-2 ring-sky-500/20"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-sm">
-                          {ministry.leader?.first_name?.[0] || 'L'}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={ministry.leader?.display_name || `${ministry.leader?.first_name || ''} ${ministry.leader?.last_name || ''}`}
+                        avatarUrl={ministry.leader?.avatar_url}
+                        size="lg"
+                        shape="circle"
+                        border="border-2 border-white shadow-xs"
+                      />
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                           {ministry.leader?.display_name || 'Unassigned Leader'}
@@ -351,17 +348,13 @@ export function MinistryDetailModal({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {ministry.assistant_leader?.avatar_url ? (
-                        <img
-                          src={ministry.assistant_leader.avatar_url}
-                          alt={ministry.assistant_leader.display_name || 'Co-Leader'}
-                          className="h-12 w-12 rounded-full object-cover ring-2 ring-purple-500/20"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
-                          {ministry.assistant_leader?.first_name?.[0] || 'A'}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={ministry.assistant_leader?.display_name || `${ministry.assistant_leader?.first_name || ''} ${ministry.assistant_leader?.last_name || ''}`}
+                        avatarUrl={ministry.assistant_leader?.avatar_url}
+                        size="lg"
+                        shape="circle"
+                        border="border-2 border-white shadow-xs"
+                      />
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                           {ministry.assistant_leader?.display_name || 'No assistant leader assigned'}
@@ -508,17 +501,12 @@ export function MinistryDetailModal({
                           <tr key={mm.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5">
-                                {mm.profile?.avatar_url ? (
-                                  <img
-                                    src={mm.profile.avatar_url}
-                                    alt={mm.profile.display_name || ''}
-                                    className="h-8 w-8 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
-                                    {mm.profile?.first_name?.[0] || 'M'}
-                                  </div>
-                                )}
+                                <UserAvatar
+                                  name={mm.profile?.display_name || `${mm.profile?.first_name || ''} ${mm.profile?.last_name || ''}` || mm.profile?.email || 'Member'}
+                                  avatarUrl={mm.profile?.avatar_url}
+                                  size="sm"
+                                  shape="circle"
+                                />
                                 <div>
                                   <span className="font-semibold text-slate-900 dark:text-slate-100 block">
                                     {mm.profile?.display_name || mm.profile?.email || 'Member'}

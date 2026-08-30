@@ -4,6 +4,7 @@ import {
   X, Phone, Mail, MapPin, Calendar, Users, HeartHandshake, ShieldCheck, 
   Heart, Edit3, Trash2, Lock, Unlock, ExternalLink, MessageSquare, AlertCircle, Plus, Camera, Crown
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface MemberDetailModalProps {
   member: Member | null;
@@ -60,18 +61,14 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
               className="relative group cursor-pointer shrink-0"
               title="Click to edit profile or change photo"
             >
-              {member.avatarUrl && member.avatarUrl.trim() ? (
-                <img
-                  src={member.avatarUrl.trim()}
-                  alt={fullName}
-                  className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-500 shadow-md group-hover:opacity-85 transition"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-2xl bg-amber-500 text-slate-950 font-extrabold text-xl flex items-center justify-center border-2 border-amber-400 group-hover:opacity-85 transition">
-                  {initials}
-                </div>
-              )}
+              <UserAvatar
+                name={fullName}
+                avatarUrl={member.avatarUrl}
+                size="2xl"
+                shape="rounded"
+                border="border-2 border-amber-500 shadow-md"
+                className="group-hover:opacity-85 transition"
+              />
               <div className="absolute inset-0 bg-slate-950/60 rounded-2xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white">
                 <Camera className="w-5 h-5 text-amber-300" />
               </div>

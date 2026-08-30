@@ -251,8 +251,9 @@ export default function App() {
       cloud.forEach((notif) => {
         if (!notifiedIdsRef.current.has(notif.id)) {
           notifiedIdsRef.current.add(notif.id);
-          // If notification was created by another user, notify on this device:
-          if (!notif.read && notif.createdByUserId && notif.createdByUserId !== currentUserId) {
+          const isReadByMe = currentUserId ? Boolean(notif.readByUserIds?.includes(currentUserId)) : notif.read;
+          // If notification was created by another user and not yet read by current user, notify on this device:
+          if (!isReadByMe && notif.createdByUserId && notif.createdByUserId !== currentUserId) {
             sendMobilePanelNotification({
               id: notif.id,
               title: notif.title,
@@ -503,9 +504,36 @@ export default function App() {
     return rawEvents.filter(e => (e.church_id === activeChurchId || e.churchId === activeChurchId || (!e.church_id && !e.churchId && activeChurchId === 'church-1')));
   }, [rawEvents, activeChurchId]);
 
+  const churchUsers = useMemo(() => {
+    return allUsers.filter(
+      (u) =>
+        u.church_id === activeChurchId ||
+        u.churchId === activeChurchId ||
+        (!u.church_id && !u.churchId && activeChurchId === 'church-1')
+    );
+  }, [allUsers, activeChurchId]);
+
   const notifications = useMemo(() => {
-    return rawNotifications.filter(n => (n.church_id === activeChurchId || n.churchId === activeChurchId || (!n.church_id && !n.churchId && activeChurchId === 'church-1')));
-  }, [rawNotifications, activeChurchId]);
+    const currentUserId = authSession?.user?.id;
+    return rawNotifications
+      .filter(n => (n.church_id === activeChurchId || n.churchId === activeChurchId || (!n.church_id && !n.churchId && activeChurchId === 'church-1')))
+      .filter(n => {
+        // Once ALL users in the active church have seen the notification, it is hidden from notifications list
+        if (churchUsers.length > 0) {
+          const readList = n.readByUserIds || (n.read ? churchUsers.map(u => u.id) : []);
+          const allSeen = churchUsers.every(u => readList.includes(u.id));
+          if (allSeen) return false;
+        }
+        return true;
+      })
+      .map(n => {
+        const isReadForMe = Boolean(currentUserId && n.readByUserIds?.includes(currentUserId));
+        return {
+          ...n,
+          read: isReadForMe,
+        };
+      });
+  }, [rawNotifications, activeChurchId, churchUsers, authSession?.user?.id]);
 
   const announcements = useMemo(() => {
     return rawAnnouncements.filter(a => (a.church_id === activeChurchId || a.churchId === activeChurchId || (!a.church_id && !a.churchId && activeChurchId === 'church-1')));
@@ -779,6 +807,7 @@ export default function App() {
         category: 'Announcement',
         date: stamped.date || new Date().toISOString().split('T')[0],
         read: false,
+        readByUserIds: [],
         linkTab: 'ministries',
         createdByUserId: currentUser?.id,
         authorName: stamped.authorName || currentUser?.name,
@@ -998,6 +1027,7 @@ export default function App() {
         category: isUrgent ? 'Emergency' : 'Prayer',
         date: new Date().toISOString().split('T')[0],
         read: false,
+        readByUserIds: [],
         linkTab: 'prayers',
         createdByUserId: currentUser?.id,
         authorName: stampedPrayer.memberName || currentUser?.name,
@@ -1069,6 +1099,7 @@ export default function App() {
         category: 'Prayer',
         date: new Date().toISOString().split('T')[0],
         read: false,
+        readByUserIds: [],
         linkTab: 'prayers',
         createdByUserId: currentUser?.id,
         authorName: currentUser?.name,
@@ -1106,6 +1137,7 @@ export default function App() {
       category: 'Prayer',
       date: new Date().toISOString().split('T')[0],
       read: false,
+      readByUserIds: [],
       linkTab: 'prayers',
       createdByUserId: currentUser?.id,
       authorName: newUpdate.authorName,
@@ -1202,6 +1234,7 @@ export default function App() {
         category: 'Event',
         date: new Date().toISOString().split('T')[0],
         read: false,
+        readByUserIds: [],
         linkTab: 'calendar',
         createdByUserId: currentUser?.id,
         authorName: currentUser?.name,
@@ -1238,22 +1271,47 @@ export default function App() {
   };
 
   const handleMarkNotifRead = (id: string) => {
+    const currentUserId = currentUser?.id;
     const target = rawNotifications.find((n) => n.id === id);
-    const updated = target ? { ...target, read: true } : null;
-    const next = rawNotifications.map((n) => n.id === id ? { ...n, read: true } : n);
+    if (!target) return;
+    const nextReadUserIds = Array.from(
+      new Set([...(target.readByUserIds || []), ...(currentUserId ? [currentUserId] : [])])
+    );
+    const updated: AppNotification = {
+      ...target,
+      readByUserIds: nextReadUserIds,
+      read: nextReadUserIds.length > 0,
+    };
+    const next = rawNotifications.map((n) => (n.id === id ? updated : n));
     setRawNotifications(next);
     saveStoredNotifications(next);
-    if (updated) {
-      saveNotificationToFirestore(updated);
-    }
+    saveNotificationToFirestore(updated).catch(console.warn);
   };
 
   const handleClearAllNotifs = () => {
-    const toClear = [...notifications];
-    const remaining = rawNotifications.filter(n => (n.church_id !== activeChurchId && n.churchId !== activeChurchId));
-    setRawNotifications(remaining);
-    saveStoredNotifications(remaining);
-    clearAllNotificationsFromFirestore(toClear);
+    const currentUserId = currentUser?.id;
+    if (!currentUserId) return;
+    const next = rawNotifications.map((n) => {
+      if (
+        n.church_id === activeChurchId ||
+        n.churchId === activeChurchId ||
+        (!n.church_id && !n.churchId && activeChurchId === 'church-1')
+      ) {
+        const nextReadUserIds = Array.from(
+          new Set([...(n.readByUserIds || []), currentUserId])
+        );
+        const updated: AppNotification = {
+          ...n,
+          readByUserIds: nextReadUserIds,
+          read: nextReadUserIds.length > 0,
+        };
+        saveNotificationToFirestore(updated).catch(console.warn);
+        return updated;
+      }
+      return n;
+    });
+    setRawNotifications(next);
+    saveStoredNotifications(next);
   };
 
   const handleSendNotification = (notif: AppNotification) => {
@@ -1263,6 +1321,8 @@ export default function App() {
       churchId: activeChurchId,
       createdByUserId: currentUser?.id,
       authorName: currentUser?.name,
+      read: false,
+      readByUserIds: [],
     };
     const next = [stamped, ...rawNotifications];
     setRawNotifications(next);
@@ -1305,6 +1365,7 @@ export default function App() {
         category: isEmergency ? 'Emergency' : 'Announcement',
         date: stamped.date || new Date().toISOString().split('T')[0],
         read: false,
+        readByUserIds: [],
         linkTab: 'announcements',
         createdByUserId: currentUser?.id,
         authorName: stamped.authorName || currentUser?.name,
@@ -1861,6 +1922,8 @@ export default function App() {
             <NotificationCenter
               notifications={notifications}
               currentChurch={currentChurch}
+              currentUser={currentUser}
+              allUsers={allUsers}
               onMarkRead={handleMarkNotifRead}
               onClearAll={handleClearAllNotifs}
               onSendNotification={handleSendNotification}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Member, AttendanceRecord, SaaSUser, CompleteChurchSettings } from '../types';
 import { Users, Calendar, CheckCircle2, Circle, UserCheck, Plus, Sparkles, Clock, BarChart3, Save, Trash2 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface AttendanceTrackerProps {
   members?: Member[];
@@ -274,15 +275,13 @@ export const AttendanceTracker: React.FC<AttendanceTrackerProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
-                        {m.avatarUrl && m.avatarUrl.trim() ? (
-                          <img src={m.avatarUrl.trim()} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center font-bold text-slate-600 text-xs">
-                            {m.firstName[0]}{m.lastName[0]}
-                          </div>
-                        )}
-                      </div>
+                      <UserAvatar
+                        name={`${m.firstName} ${m.lastName}`}
+                        avatarUrl={m.avatarUrl}
+                        size="sm"
+                        shape="circle"
+                        border="border border-slate-300 shadow-xs"
+                      />
                       <div>
                         <p className="text-xs font-bold text-slate-900">{m.firstName} {m.lastName}</p>
                         <span className="text-[10px] text-slate-500 px-1.5 py-0.5 rounded bg-slate-200/60 font-medium">

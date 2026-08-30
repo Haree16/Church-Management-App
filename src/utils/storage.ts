@@ -68,12 +68,57 @@ function setItem<T>(key: string, value: T): void {
   }
 }
 
+const REMOVED_MOCK_USER_IDS = new Set([
+  'user-admin',
+  'user-pastor-samuel',
+  'user-pastor-john',
+  'user-grace-teacher',
+  'user-rajesh-leader',
+  'user-priya-treasurer',
+  'user-anitha-member',
+  'user-thomas-volunteer',
+  'user-pastor-david',
+  'user-pastor-mathew',
+]);
+
+const REMOVED_MOCK_USERNAMES = new Set([
+  'admin',
+  'pastor.samuel',
+  'pastor.john',
+  'grace.teacher',
+  'rajesh.leader',
+  'priya.treasurer',
+  'anitha.member',
+  'thomas.volunteer',
+  'pastor.david',
+  'pastor.mathew',
+]);
+
+const REMOVED_MOCK_MEMBER_IDS = new Set([
+  'mem-1',
+  'mem-2',
+  'mem-3',
+  'mem-4',
+  'mem-5',
+  'mem-gwc-1',
+  'mem-crc-1',
+]);
+
 // 1. Auth Session Persistence (Session stays indefinitely across reloads until explicit logout or cache cleared)
 export const getStoredAuthSession = (): AuthSession | null => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.AUTH_SESSION);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const session: AuthSession = JSON.parse(raw);
+    if (
+      session?.user &&
+      (REMOVED_MOCK_USER_IDS.has(session.user.id) ||
+        REMOVED_MOCK_USERNAMES.has(session.user.username?.toLowerCase()))
+    ) {
+      session.user = INITIAL_SAAS_USERS[0];
+      saveStoredAuthSession(session);
+    }
+    return session;
   } catch (err) {
     console.error('Failed to read auth session', err);
     return null;
@@ -96,7 +141,16 @@ export const clearStoredAuthSession = (): void => {
 export const getStoredChurches = (): ChurchTenant[] => getItem(STORAGE_KEYS.CHURCHES, INITIAL_CHURCHES);
 export const saveStoredChurches = (data: ChurchTenant[]): void => setItem(STORAGE_KEYS.CHURCHES, data);
 
-export const getStoredUsers = (): SaaSUser[] => getItem(STORAGE_KEYS.USERS, INITIAL_SAAS_USERS);
+export const getStoredUsers = (): SaaSUser[] => {
+  const users = getItem(STORAGE_KEYS.USERS, INITIAL_SAAS_USERS);
+  const filtered = (users || []).filter(
+    u => !REMOVED_MOCK_USER_IDS.has(u.id) && !REMOVED_MOCK_USERNAMES.has(u.username?.toLowerCase())
+  );
+  if (!filtered.some(u => u.username?.toLowerCase() === 'superadmin')) {
+    filtered.unshift(INITIAL_SAAS_USERS[0]);
+  }
+  return filtered;
+};
 export const saveStoredUsers = (data: SaaSUser[]): void => setItem(STORAGE_KEYS.USERS, data);
 
 // 2.1 Church Settings Map per Tenant
@@ -150,7 +204,10 @@ export const saveStoredChurchSettings = (churchId: string, settings: CompleteChu
 };
 
 // 3. Core Church Records
-export const getStoredMembers = (): Member[] => getItem(STORAGE_KEYS.MEMBERS, INITIAL_MEMBERS);
+export const getStoredMembers = (): Member[] => {
+  const members = getItem(STORAGE_KEYS.MEMBERS, INITIAL_MEMBERS);
+  return (members || []).filter(m => !REMOVED_MOCK_MEMBER_IDS.has(m.id));
+};
 export const saveStoredMembers = (data: Member[]): void => setItem(STORAGE_KEYS.MEMBERS, data);
 
 // 3.1 Reusable Ministries Framework
@@ -172,7 +229,12 @@ export const saveStoredMinistryActivities = (data: MinistryActivity[]): void => 
 export const getStoredMinistryAnnouncements = (): MinistryAnnouncement[] => getItem(STORAGE_KEYS.MINISTRY_ANNOUNCEMENTS, INITIAL_MINISTRY_ANNOUNCEMENTS);
 export const saveStoredMinistryAnnouncements = (data: MinistryAnnouncement[]): void => setItem(STORAGE_KEYS.MINISTRY_ANNOUNCEMENTS, data);
 
-export const getStoredPrayers = (): PrayerRequest[] => getItem(STORAGE_KEYS.PRAYERS, INITIAL_PRAYERS);
+export const getStoredPrayers = (): PrayerRequest[] => {
+  const prayers = getItem(STORAGE_KEYS.PRAYERS, INITIAL_PRAYERS);
+  return (prayers || []).filter(
+    p => !['pray-1', 'pray-2', 'pray-3', 'pray-gwc-1'].includes(p.id) && !REMOVED_MOCK_MEMBER_IDS.has(p.memberId || '')
+  );
+};
 export const saveStoredPrayers = (data: PrayerRequest[]): void => setItem(STORAGE_KEYS.PRAYERS, data);
 
 export const getStoredRoster = (): RosterAssignment[] => getItem(STORAGE_KEYS.ROSTER, INITIAL_ROSTER);

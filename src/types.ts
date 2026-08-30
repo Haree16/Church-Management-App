@@ -234,6 +234,7 @@ export interface AppNotification {
   category: 'Announcement' | 'Prayer' | 'Event' | 'Emergency' | 'Devotional';
   date: string;
   read: boolean;
+  readByUserIds?: string[];
   linkTab?: string;
   createdByUserId?: string;
   authorName?: string;

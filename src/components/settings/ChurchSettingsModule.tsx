@@ -915,7 +915,7 @@ export const ChurchSettingsModule: React.FC<ChurchSettingsModuleProps> = ({
                         }))
                       }
                       disabled={!canEdit}
-                      placeholder="Pastor Samuel Raj"
+                      placeholder="e.g. Senior Pastor / Church Admin"
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
@@ -2239,7 +2239,7 @@ export const ChurchSettingsModule: React.FC<ChurchSettingsModuleProps> = ({
                     type="text"
                     value={editingMinistry.leaderName}
                     onChange={(e) => setEditingMinistry({ ...editingMinistry, leaderName: e.target.value })}
-                    placeholder="Rajesh Kumar"
+                    placeholder="e.g. Ministry Coordinator"
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                   />
                 </div>

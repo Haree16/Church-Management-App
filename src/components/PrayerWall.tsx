@@ -4,6 +4,7 @@ import {
   Heart, Sparkles, Filter, Plus, CheckCircle2, AlertCircle, Clock, 
   MessageSquare, User, ShieldAlert, Share2, Check, Send, Trash2, Edit3
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface PrayerWallProps {
   prayers?: PrayerRequest[];
@@ -291,13 +292,18 @@ export const PrayerWall: React.FC<PrayerWallProps> = ({
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="font-semibold text-slate-700">{prayer.memberName}</span>
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 pt-0.5">
+                      <UserAvatar
+                        name={prayer.memberName}
+                        avatarUrl={members.find(m => m.id === prayer.memberId || `${m.firstName} ${m.lastName}`.toLowerCase().trim() === prayer.memberName.toLowerCase().trim())?.avatarUrl}
+                        size="xs"
+                        shape="circle"
+                      />
+                      <span className="font-semibold text-slate-800">{prayer.memberName}</span>
                       <span>•</span>
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{new Date(prayer.dateSubmitted).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                    </p>
+                    </div>
                   </div>
 
                   {/* Status Badge, Edit & Delete Buttons */}

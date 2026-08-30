@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UserAvatar } from '../common/UserAvatar';
 import {
   Users,
   MapPin,
@@ -345,17 +346,13 @@ export function GroupDetailModal({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {group.leader?.avatar_url ? (
-                        <img
-                          src={group.leader.avatar_url}
-                          alt={group.leader.display_name || ''}
-                          className="h-11 w-11 rounded-full object-cover ring-2 ring-sky-500/20"
-                        />
-                      ) : (
-                        <div className="h-11 w-11 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
-                          {group.leader?.first_name?.[0] || 'L'}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={group.leader?.display_name || `${group.leader?.first_name || ''} ${group.leader?.last_name || ''}`}
+                        avatarUrl={group.leader?.avatar_url}
+                        size="lg"
+                        shape="circle"
+                        border="border-2 border-white shadow-xs"
+                      />
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                           {group.leader?.display_name || 'Assigned Leader'}
@@ -376,17 +373,13 @@ export function GroupDetailModal({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {group.assistant_leader?.avatar_url ? (
-                        <img
-                          src={group.assistant_leader.avatar_url}
-                          alt={group.assistant_leader.display_name || ''}
-                          className="h-11 w-11 rounded-full object-cover ring-2 ring-purple-500/20"
-                        />
-                      ) : (
-                        <div className="h-11 w-11 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
-                          {group.assistant_leader?.first_name?.[0] || 'C'}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={group.assistant_leader?.display_name || `${group.assistant_leader?.first_name || ''} ${group.assistant_leader?.last_name || ''}`}
+                        avatarUrl={group.assistant_leader?.avatar_url}
+                        size="lg"
+                        shape="circle"
+                        border="border-2 border-white shadow-xs"
+                      />
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                           {group.assistant_leader?.display_name || 'None assigned'}
@@ -531,17 +524,12 @@ export function GroupDetailModal({
                           <tr key={gm.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5">
-                                {gm.profile?.avatar_url ? (
-                                  <img
-                                    src={gm.profile.avatar_url}
-                                    alt={gm.profile.display_name || ''}
-                                    className="h-8 w-8 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
-                                    {gm.profile?.first_name?.[0] || 'M'}
-                                  </div>
-                                )}
+                                <UserAvatar
+                                  name={gm.profile?.display_name || `${gm.profile?.first_name || ''} ${gm.profile?.last_name || ''}` || gm.profile?.email || 'Member'}
+                                  avatarUrl={gm.profile?.avatar_url}
+                                  size="sm"
+                                  shape="circle"
+                                />
                                 <div>
                                   <span className="font-semibold text-slate-900 dark:text-slate-100 block">
                                     {gm.profile?.display_name || gm.profile?.email || 'Member'}

@@ -5,6 +5,7 @@ import {
   ChevronRight, Sparkles, Filter, X, UserPlus, Heart, MessageSquare, Trash2,
   ArrowUpDown, Crown
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface MemberListProps {
   members?: Member[];
@@ -280,18 +281,14 @@ export const MemberList: React.FC<MemberListProps> = ({
                       onClick={() => onSelectMember(member)}
                       className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0"
                     >
-                      {member.avatarUrl && member.avatarUrl.trim() ? (
-                        <img
-                          src={member.avatarUrl.trim()}
-                          alt={fullName}
-                          className="w-12 h-12 rounded-2xl object-cover border border-slate-200 shrink-0 group-hover:scale-105 transition"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-800 font-bold flex items-center justify-center border border-amber-500/30 shrink-0 group-hover:scale-105 transition">
-                          {initials}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={fullName}
+                        avatarUrl={member.avatarUrl}
+                        size="lg"
+                        shape="rounded"
+                        border="border border-slate-200"
+                        className="group-hover:scale-105 transition"
+                      />
 
                       <div className="min-w-0">
                         <div className="flex items-center space-x-2">

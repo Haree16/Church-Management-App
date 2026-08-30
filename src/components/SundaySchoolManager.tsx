@@ -6,6 +6,7 @@ import {
   ClipboardCheck, Calendar, Users, CheckCircle2, XCircle, History, UserCheck,
   Smile, ExternalLink, FileText, ChevronRight
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface SundaySchoolManagerProps {
   classes?: SundaySchoolClass[];
@@ -530,14 +531,22 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
                 {classStudents.map((stud) => (
                   <div key={stud.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 hover:border-purple-200 transition">
                     <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h5 className="text-sm font-extrabold text-slate-900">{stud.studentName}</h5>
-                          <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">
-                            {stud.attendancePresentCount || 0} Attended
-                          </span>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          name={stud.studentName}
+                          size="md"
+                          shape="rounded"
+                          border="border border-purple-200 shadow-2xs"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h5 className="text-sm font-extrabold text-slate-900">{stud.studentName}</h5>
+                            <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">
+                              {stud.attendancePresentCount || 0} Attended
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">Age {stud.age} • Parent: {stud.parentName}</p>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">Age {stud.age} • Parent: {stud.parentName}</p>
                       </div>
 
                       <div className="flex items-center gap-1.5">

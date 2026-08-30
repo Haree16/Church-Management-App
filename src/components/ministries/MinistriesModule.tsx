@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { auditService } from '../../services/auditService';
 import { canCreateEditMinistry, canManageAllMinistries, getRoleConfig } from '../../utils/rbac';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface MinistriesModuleProps {
   currentChurch: ChurchTenant;
@@ -971,13 +972,13 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
 
                     return (
                       <div key={mm.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-amber-400/50 transition flex items-start gap-3 relative group">
-                        <div className="w-11 h-11 rounded-xl bg-amber-500 text-slate-950 font-bold flex items-center justify-center text-sm shrink-0 border border-amber-400 overflow-hidden">
-                          {m?.avatarUrl ? (
-                            <img src={m.avatarUrl} alt={fullName} className="w-full h-full object-cover" />
-                          ) : (
-                            initials
-                          )}
-                        </div>
+                        <UserAvatar
+                          name={fullName}
+                          avatarUrl={m?.avatarUrl}
+                          size="md"
+                          shape="rounded"
+                          border="border border-slate-200 shadow-2xs"
+                        />
 
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-xs text-slate-900 truncate">{fullName}</h4>

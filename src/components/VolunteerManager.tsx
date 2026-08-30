@@ -6,6 +6,7 @@ import {
   Clock, Sparkles, Filter, ChevronRight, Phone, Mail, UserCheck,
   ExternalLink, Award, Crown
 } from 'lucide-react';
+import { UserAvatar } from './common/UserAvatar';
 
 interface VolunteerManagerProps {
   members: Member[];
@@ -292,19 +293,13 @@ export const VolunteerManager: React.FC<VolunteerManagerProps> = ({
                       className="flex items-center space-x-3 cursor-pointer"
                       onClick={() => onSelectMember(vol)}
                     >
-                      {vol.avatarUrl && vol.avatarUrl.trim() ? (
-                        <img
-                          src={vol.avatarUrl.trim()}
-                          alt={vol.firstName}
-                          className="w-11 h-11 rounded-xl object-cover border border-slate-200"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-center border border-emerald-200">
-                          {vol.firstName[0]}
-                          {vol.lastName[0]}
-                        </div>
-                      )}
+                      <UserAvatar
+                        name={`${vol.firstName} ${vol.lastName}`}
+                        avatarUrl={vol.avatarUrl}
+                        size="md"
+                        shape="rounded"
+                        border="border border-slate-200"
+                      />
                       <div>
                         <div className="flex items-center gap-1.5">
                           <h3 className="font-bold text-slate-900 text-sm hover:text-emerald-700 transition">

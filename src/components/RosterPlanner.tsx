@@ -3,6 +3,7 @@ import { RosterAssignment, Member, ChurchMinistry, SaaSUser } from '../types';
 import { MINISTRY_TEAMS } from '../data/initialData';
 import { Calendar, UserCheck, Plus, CheckCircle2, Clock, Trash2, Edit3, X, Shield, Lock } from 'lucide-react';
 import { getRoleConfig } from '../utils/rbac';
+import { UserAvatar } from './common/UserAvatar';
 
 interface RosterPlannerProps {
   roster?: RosterAssignment[];
@@ -217,10 +218,15 @@ export const RosterPlanner: React.FC<RosterPlannerProps> = ({
                       )}
                     </div>
 
-                    <p className="text-xs font-semibold text-slate-800 mt-2 flex items-center gap-1.5">
-                      <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="text-xs font-semibold text-slate-800 mt-2 flex items-center gap-1.5">
+                      <UserAvatar
+                        name={item.memberName}
+                        avatarUrl={safeMembers.find(m => m.id === item.memberId || `${m.firstName} ${m.lastName}`.toLowerCase().trim() === item.memberName.toLowerCase().trim())?.avatarUrl}
+                        size="xs"
+                        shape="circle"
+                      />
                       <span>{item.memberName}</span>
-                    </p>
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">

@@ -9,6 +9,7 @@ import {
 import { AppTab } from './BottomNav';
 import { ChurchTenant, SaaSUser, ChurchModuleToggles, CompleteChurchSettings, AppNotification } from '../types';
 import { getRoleConfig, canAccessChurchSettings } from '../utils/rbac';
+import { UserAvatar } from './common/UserAvatar';
 
 interface HeaderProps {
   memberCount: number;
@@ -16,8 +17,8 @@ interface HeaderProps {
   volunteerCount: number;
   isMobileFrame: boolean;
   onToggleFrame: () => void;
-  onOpenAddMember: () => void;
-  onOpenAddPrayer: () => void;
+  onOpenAddMember?: () => void;
+  onOpenAddPrayer?: () => void;
   onOpenExportModal: () => void;
   activeTab: AppTab;
   currentChurch?: ChurchTenant;
@@ -33,17 +34,6 @@ interface HeaderProps {
   onNavigateTab?: (tab: AppTab) => void;
   onUpdateUserProfile?: (updatedUser: SaaSUser) => void;
 }
-
-const PROFILE_AVATAR_PRESETS = [
-  { label: 'Pastor / Elder', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Ministry Leader', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Worship Lead', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Sunday School', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Deacon / Staff', url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Sister / Member', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Youth Leader', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80' },
-  { label: 'Family Brother', url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=300&q=80' },
-];
 
 /**
  * Resizes and compresses image to lightweight base64 Data URL
@@ -331,31 +321,6 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Quick Add Member Shortcut */}
-          {roleConfig.canManageMembers && (
-            <button
-              id="btn-header-add-member"
-              onClick={onOpenAddMember}
-              className="flex items-center space-x-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-2.5 py-1.5 rounded-xl transition shadow-sm active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[3]" />
-              <span className="hidden sm:inline">New Member</span>
-              <span className="sm:hidden">Member</span>
-            </button>
-          )}
-
-          {/* Quick Add Prayer Shortcut */}
-          {roleConfig.canManagePrayers && (
-            <button
-              id="btn-header-add-prayer"
-              onClick={onOpenAddPrayer}
-              className="flex items-center space-x-1 bg-rose-500 hover:bg-rose-400 text-white font-semibold text-xs px-2.5 py-1.5 rounded-xl transition shadow-sm active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span className="hidden sm:inline">New Prayer</span>
-              <span className="sm:hidden">Prayer</span>
-            </button>
-          )}
 
           {/* Top Bell Icon Notification Button */}
           <div className="relative">
@@ -537,11 +502,12 @@ export const Header: React.FC<HeaderProps> = ({
               }}
               className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 p-1 pl-1.5 pr-2.5 rounded-full transition"
             >
-              <img
-                src={currentUser?.avatarUrl?.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
-                alt={currentUser?.name || 'User'}
-                className="w-6 h-6 rounded-full object-cover border border-amber-400/50"
-                referrerPolicy="no-referrer"
+              <UserAvatar
+                name={currentUser?.name}
+                avatarUrl={currentUser?.avatarUrl}
+                size="xs"
+                shape="circle"
+                border="border border-amber-400/60"
               />
               <div className="text-left hidden sm:block">
                 <div className="text-xs font-semibold text-slate-100 leading-none truncate max-w-[100px]">
@@ -562,11 +528,12 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="bg-slate-900 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
                     <div className="flex items-center space-x-3.5 min-w-0">
                       <div className="relative">
-                        <img
-                          src={editAvatarUrl?.trim() || currentUser?.avatarUrl?.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
-                          alt={currentUser?.name}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shrink-0"
-                          referrerPolicy="no-referrer"
+                        <UserAvatar
+                          name={currentUser?.name}
+                          avatarUrl={editAvatarUrl?.trim() || currentUser?.avatarUrl?.trim()}
+                          size="lg"
+                          shape="circle"
+                          border="border-2 border-amber-400 shadow-md"
                         />
                         {isEditingProfile && (
                           <button
@@ -719,20 +686,13 @@ export const Header: React.FC<HeaderProps> = ({
                           </div>
 
                           <div className="flex items-center gap-3">
-                            <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 shrink-0 bg-white shadow-inner flex items-center justify-center">
-                              {editAvatarUrl ? (
-                                <img
-                                  src={editAvatarUrl}
-                                  alt="Preview"
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
-                                  }}
-                                />
-                              ) : (
-                                <UserIcon className="w-6 h-6 text-slate-400" />
-                              )}
-                            </div>
+                            <UserAvatar
+                              name={editName || currentUser?.name}
+                              avatarUrl={editAvatarUrl}
+                              size="xl"
+                              shape="rounded"
+                              border="border-2 border-emerald-500 shadow-md"
+                            />
 
                             <div className="flex-1 space-y-1.5">
                               <div className="flex gap-2">
@@ -746,46 +706,21 @@ export const Header: React.FC<HeaderProps> = ({
                                   <span>{isUploadingPhoto ? 'Uploading...' : 'Upload Photo'}</span>
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPresetPicker(!showPresetPicker)}
-                                  className="py-1.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition"
-                                >
-                                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                                  <span>Presets</span>
-                                </button>
+                                {editAvatarUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditAvatarUrl('')}
+                                    className="py-1.5 px-3 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Remove</span>
+                                  </button>
+                                )}
                               </div>
 
-                              <p className="text-[10px] text-slate-500">Pick from camera, device gallery, or preset avatars.</p>
+                              <p className="text-[10px] text-slate-500">Pick photo from device or use automatic initials badge.</p>
                             </div>
                           </div>
-
-                          {/* Avatar Presets Grid */}
-                          {showPresetPicker && (
-                            <div className="pt-2 border-t border-slate-200">
-                              <span className="text-[10px] font-bold text-slate-600 block mb-1.5">Select a Curated Avatar:</span>
-                              <div className="grid grid-cols-4 gap-2">
-                                {PROFILE_AVATAR_PRESETS.map((preset) => (
-                                  <button
-                                    key={preset.label}
-                                    type="button"
-                                    onClick={() => {
-                                      setEditAvatarUrl(preset.url);
-                                      setShowPresetPicker(false);
-                                    }}
-                                    className={`p-1 rounded-xl border text-center transition flex flex-col items-center gap-1 ${
-                                      editAvatarUrl === preset.url
-                                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/30'
-                                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                                    }`}
-                                  >
-                                    <img src={preset.url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                                    <span className="text-[9px] font-medium text-slate-600 line-clamp-1">{preset.label.split('/')[0]}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
 
                         {/* Full Name */}
