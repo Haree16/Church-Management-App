@@ -114,6 +114,7 @@ export interface MinistryMember {
   ministryId: string;
   memberId: string;
   ministryRole: string; // e.g. "Leader", "Assistant Leader", "Volunteer", "Coordinator", "Teacher", "Musician", "Vocalist", "Team Member"
+  role?: string;
   status: 'Active' | 'Inactive';
   joinedAt: string;
   notes?: string;
@@ -165,6 +166,7 @@ export interface MinistryActivity {
   presentMemberIds: string[];
   notes?: string;
   createdAt: string;
+  createdByUserId?: string;
 }
 
 export interface MinistryAnnouncement {
@@ -194,6 +196,8 @@ export interface RosterAssignment {
   memberId: string;
   memberName: string;
   confirmed: boolean;
+  createdByUserId?: string;
+  createdByName?: string;
 }
 
 // 2. ATTENDANCE MODULE
@@ -231,13 +235,29 @@ export interface AppNotification {
   churchId?: string;
   title: string;
   message: string;
-  category: 'Announcement' | 'Prayer' | 'Event' | 'Emergency' | 'Devotional';
+  category: 'Announcement' | 'Prayer' | 'Event' | 'Emergency' | 'Devotional' | 'Ministry' | 'Roster' | 'Activity';
   date: string;
   read: boolean;
   readByUserIds?: string[];
   linkTab?: string;
   createdByUserId?: string;
   authorName?: string;
+  targetUserIds?: string[]; // Specific SaaSUser IDs targeted
+  targetMemberIds?: string[]; // Specific Member IDs targeted
+  excludeUserIds?: string[]; // User IDs excluded (e.g. creator)
+  excludeMemberIds?: string[]; // Member IDs excluded
+  metadata?: {
+    ministryId?: string;
+    ministryName?: string;
+    teamId?: string;
+    teamName?: string;
+    activityId?: string;
+    activityName?: string;
+    rosterId?: string;
+    memberId?: string;
+    memberName?: string;
+    actionType?: 'member_added' | 'activity_scheduled' | 'roster_created' | 'roster_confirmed' | 'announcement';
+  };
 }
 
 // 8. PASTOR ANNOUNCEMENTS MODULE
@@ -496,6 +516,7 @@ export interface ChurchSecurityConfig {
 export interface ChurchModuleToggles {
   dashboard: boolean;     // Dashboard & Church Analytics
   reports: boolean;       // Reports & Analytics Module
+  visitors: boolean;      // Visitor Management & Follow-up
   ministries: boolean;    // Ministries Module
   directory: boolean;     // Members
   prayers: boolean;       // Prayer

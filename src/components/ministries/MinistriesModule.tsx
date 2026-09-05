@@ -17,6 +17,7 @@ import {
 import { auditService } from '../../services/auditService';
 import { canCreateEditMinistry, canManageAllMinistries, getRoleConfig } from '../../utils/rbac';
 import { UserAvatar } from '../common/UserAvatar';
+import { inferServiceNameForDate } from '../../utils/notificationUtils';
 
 interface MinistriesModuleProps {
   currentChurch: ChurchTenant;
@@ -75,6 +76,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
   ministryAnnouncements = [],
   events = [],
   roster = [],
+  churchSettings,
   onSaveMinistry,
   onDeleteMinistry,
   onSaveMinistryMember,
@@ -117,6 +119,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
   const [teamFormLeader, setTeamFormLeader] = useState('');
 
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<MinistryActivity | null>(null);
   const [activityFormName, setActivityFormName] = useState('');
   const [activityFormDesc, setActivityFormDesc] = useState('');
   const [activityFormDate, setActivityFormDate] = useState(new Date().toISOString().split('T')[0]);
@@ -124,6 +127,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
   const [activityFormEndTime, setActivityFormEndTime] = useState('07:30 PM');
   const [activityFormLocation, setActivityFormLocation] = useState('Main Sanctuary');
   const [activityFormTeamId, setActivityFormTeamId] = useState<string>('');
+  const [activityFormStatus, setActivityFormStatus] = useState<'Scheduled' | 'Completed' | 'Cancelled'>('Scheduled');
 
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<MinistryAnnouncement | null>(null);
@@ -134,6 +138,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [rosterRoleName, setRosterRoleName] = useState('');
   const [rosterDate, setRosterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [rosterServiceName, setRosterServiceName] = useState('');
   const [rosterMemberId, setRosterMemberId] = useState('');
 
   // WhatsApp Quick Message State
@@ -483,7 +488,35 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
     setTeamFormLeader('');
   };
 
-  // Create Activity
+  // Open Create Activity Modal
+  const handleOpenCreateActivity = () => {
+    setEditingActivity(null);
+    setActivityFormName('');
+    setActivityFormDesc('');
+    setActivityFormDate(new Date().toISOString().split('T')[0]);
+    setActivityFormStartTime('06:00 PM');
+    setActivityFormEndTime('07:30 PM');
+    setActivityFormLocation('Main Sanctuary');
+    setActivityFormTeamId('');
+    setActivityFormStatus('Scheduled');
+    setIsActivityModalOpen(true);
+  };
+
+  // Open Edit Activity Modal
+  const handleOpenEditActivity = (act: MinistryActivity) => {
+    setEditingActivity(act);
+    setActivityFormName(act.name);
+    setActivityFormDesc(act.description || '');
+    setActivityFormDate(act.date);
+    setActivityFormStartTime(act.startTime || '06:00 PM');
+    setActivityFormEndTime(act.endTime || '07:30 PM');
+    setActivityFormLocation(act.location || 'Main Sanctuary');
+    setActivityFormTeamId(act.teamId || '');
+    setActivityFormStatus(act.status || 'Scheduled');
+    setIsActivityModalOpen(true);
+  };
+
+  // Create or Update Activity
   const handleSaveActivitySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeMinistry || !activityFormName.trim()) {
@@ -492,7 +525,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
     }
 
     const activityData: MinistryActivity = {
-      id: `act-${Date.now()}`,
+      id: editingActivity ? editingActivity.id : `act-${Date.now()}`,
       church_id: activeChurchId,
       churchId: activeChurchId,
       ministryId: activeMinistry.id,
@@ -504,13 +537,16 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
       endTime: activityFormEndTime,
       location: activityFormLocation.trim(),
       leaderName: activeMinistry.leaderName,
-      status: 'Scheduled',
-      presentMemberIds: [],
-      createdAt: new Date().toISOString(),
+      status: activityFormStatus,
+      presentMemberIds: editingActivity ? editingActivity.presentMemberIds : [],
+      notes: editingActivity ? editingActivity.notes : undefined,
+      createdAt: editingActivity ? editingActivity.createdAt : new Date().toISOString(),
+      createdByUserId: editingActivity?.createdByUserId || currentUser?.id,
     };
 
     await onSaveMinistryActivity(activityData);
     setIsActivityModalOpen(false);
+    setEditingActivity(null);
     setActivityFormName('');
     setActivityFormDesc('');
   };
@@ -570,18 +606,22 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
     const targetMember = churchMembers.find((m) => m.id === rosterMemberId);
     if (!targetMember || !onSaveRosterAssignment) return;
 
+    const finalServiceName = rosterServiceName.trim() || inferServiceNameForDate(rosterDate, activeMinistry.name, churchSettings);
+
     const newAssignment: RosterAssignment = {
       id: `roster-${Date.now()}`,
       church_id: activeChurchId,
       churchId: activeChurchId,
       ministryId: activeMinistry.id,
       serviceDate: rosterDate,
-      serviceName: 'Sunday Worship Service',
+      serviceName: finalServiceName,
       roleName: rosterRoleName.trim(),
       team: (activeMinistry.name as any),
       memberId: targetMember.id,
       memberName: `${targetMember.firstName} ${targetMember.lastName}`,
       confirmed: false,
+      createdByUserId: currentUser?.id,
+      createdByName: currentUser?.name || 'Ministry Leader',
     };
 
     await onSaveRosterAssignment(newAssignment);
@@ -833,9 +873,23 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                               <span>{act.location}</span>
                             </div>
                           </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 shrink-0">
-                            {act.status}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                              act.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              act.status === 'Cancelled' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                              'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                              {act.status}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditActivity(act)}
+                              className="p-1 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition"
+                              title="Edit Activity"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1145,7 +1199,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                 </div>
 
                 <button
-                  onClick={() => setIsActivityModalOpen(true)}
+                  onClick={handleOpenCreateActivity}
                   className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1178,17 +1232,33 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                            act.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            act.status === 'Cancelled' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                            'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}>
                             {act.status}
                           </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditActivity(act)}
+                            className="p-1 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition"
+                            title="Edit Activity Details"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
                           {isSuperOrPastor && (
                             <button
+                              type="button"
                               onClick={async () => {
                                 if (confirm(`Delete activity "${act.name}"?`)) {
                                   await onDeleteMinistryActivity(act.id);
                                 }
                               }}
-                              className="p-1 text-slate-400 hover:text-rose-600"
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              title="Delete Activity"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -2165,25 +2235,30 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: SCHEDULE ACTIVITY */}
+      {/* MODAL: SCHEDULE / EDIT ACTIVITY */}
       {/* ========================================================================= */}
       {isActivityModalOpen && activeMinistry && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in zoom-in-95">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Calendar className="w-5 h-5 text-amber-400" />
-                <h3 className="font-bold text-base">Schedule Ministry Activity</h3>
+                <h3 className="font-bold text-base">
+                  {editingActivity ? 'Edit Ministry Activity' : 'Schedule Ministry Activity'}
+                </h3>
               </div>
               <button
-                onClick={() => setIsActivityModalOpen(false)}
+                onClick={() => {
+                  setIsActivityModalOpen(false);
+                  setEditingActivity(null);
+                }}
                 className="text-slate-400 hover:text-white p-1 rounded-full bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveActivitySubmit} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleSaveActivitySubmit} className="p-5 space-y-3.5 text-xs">
               <div className="space-y-1">
                 <label className="font-semibold text-slate-700">Activity Name *</label>
                 <input
@@ -2192,9 +2267,27 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                   value={activityFormName}
                   onChange={(e) => setActivityFormName(e.target.value)}
                   placeholder="e.g. Band Rehearsal, Bible Study, Training..."
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
+
+              {currentMinTeams.length > 0 && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">Assigned Sub-Team (Optional)</label>
+                  <select
+                    value={activityFormTeamId}
+                    onChange={(e) => setActivityFormTeamId(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">All Teams / Whole Ministry</option>
+                    {currentMinTeams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -2204,7 +2297,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                     required
                     value={activityFormDate}
                     onChange={(e) => setActivityFormDate(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                   />
                 </div>
 
@@ -2215,8 +2308,34 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                     value={activityFormStartTime}
                     onChange={(e) => setActivityFormStartTime(e.target.value)}
                     placeholder="06:00 PM"
-                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-amber-500"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">End Time (Optional)</label>
+                  <input
+                    type="text"
+                    value={activityFormEndTime}
+                    onChange={(e) => setActivityFormEndTime(e.target.value)}
+                    placeholder="07:30 PM"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">Status</label>
+                  <select
+                    value={activityFormStatus}
+                    onChange={(e) => setActivityFormStatus(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
                 </div>
               </div>
 
@@ -2227,26 +2346,29 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                   value={activityFormLocation}
                   onChange={(e) => setActivityFormLocation(e.target.value)}
                   placeholder="Main Sanctuary Stage"
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Description / Notes</label>
+                <label className="font-semibold text-slate-700">Description / Agenda</label>
                 <textarea
                   rows={2}
                   value={activityFormDesc}
                   onChange={(e) => setActivityFormDesc(e.target.value)}
-                  placeholder="Agenda or instructions for attendees..."
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
+                  placeholder="Agenda, songs, or instructions for attendees..."
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsActivityModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold"
+                  onClick={() => {
+                    setIsActivityModalOpen(false);
+                    setEditingActivity(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
                 >
                   Cancel
                 </button>
@@ -2254,7 +2376,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md transition"
                 >
-                  Schedule Activity
+                  {editingActivity ? 'Save Changes' : 'Schedule Activity'}
                 </button>
               </div>
             </form>
@@ -2360,6 +2482,33 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
 
             <form onSubmit={handleSaveRosterSubmit} className="p-5 space-y-4 text-xs">
               <div className="space-y-1">
+                <label className="font-semibold text-slate-700">Service Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={rosterDate}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    setRosterDate(newDate);
+                    setRosterServiceName(inferServiceNameForDate(newDate, activeMinistry.name, churchSettings));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-700">Service / Gathering Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={rosterServiceName || inferServiceNameForDate(rosterDate, activeMinistry.name, churchSettings)}
+                  onChange={(e) => setRosterServiceName(e.target.value)}
+                  placeholder="e.g. Wednesday Word & Prayer, Cottage Prayer Gathering..."
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="space-y-1">
                 <label className="font-semibold text-slate-700">Duty / Role Name *</label>
                 <input
                   type="text"
@@ -2367,18 +2516,7 @@ export const MinistriesModule: React.FC<MinistriesModuleProps> = ({
                   value={rosterRoleName}
                   onChange={(e) => setRosterRoleName(e.target.value)}
                   placeholder="e.g. Lead Vocals, Acoustic Guitar, Stage Sound..."
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Service Date *</label>
-                <input
-                  type="date"
-                  required
-                  value={rosterDate}
-                  onChange={(e) => setRosterDate(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-medium outline-none"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 

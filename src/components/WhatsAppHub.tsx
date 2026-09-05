@@ -1,9 +1,15 @@
-import React, { useState, useRef } from 'react';
-import { Member, WhatsAppReminderTemplate, WhatsAppGroup, ChurchTenant } from '../types';
+import React, { useState, useRef, useMemo } from 'react';
+import { 
+  Member, WhatsAppReminderTemplate, WhatsAppGroup, ChurchTenant, 
+  SundaySchoolClass, SundaySchoolStudent, SundaySchoolAttendanceRecord, 
+  CompleteChurchSettings, ChurchEvent, AttendanceRecord 
+} from '../types';
 import { 
   MessageSquare, Send, Copy, Check, Sparkles, Users, UserCheck, 
   ShieldCheck, HeartHandshake, PhoneCall, Plus, Trash2, Edit3, X, Save,
-  Layers, Info, AlertCircle, FileText, Tag, Link, ExternalLink, Globe, Hash
+  Layers, Info, AlertCircle, FileText, Tag, Link, ExternalLink, Globe, Hash,
+  GraduationCap, Bell, Calendar, Video, BookOpen, Award, CheckCircle2, ListChecks,
+  RefreshCw, Share2, HelpCircle
 } from 'lucide-react';
 
 interface WhatsAppHubProps {
@@ -12,6 +18,12 @@ interface WhatsAppHubProps {
   groups?: WhatsAppGroup[];
   currentChurch: ChurchTenant;
   canManageTemplates?: boolean;
+  sundaySchoolClasses?: SundaySchoolClass[];
+  sundaySchoolStudents?: SundaySchoolStudent[];
+  sundaySchoolAttendance?: SundaySchoolAttendanceRecord[];
+  churchSettings?: CompleteChurchSettings;
+  events?: ChurchEvent[];
+  attendance?: AttendanceRecord[];
   onSaveTemplate?: (template: WhatsAppReminderTemplate) => void;
   onDeleteTemplate?: (id: string) => void;
   onSaveGroup?: (group: WhatsAppGroup) => void;
@@ -20,8 +32,8 @@ interface WhatsAppHubProps {
 
 const STANDARD_CATEGORIES = [
   'Service Reminder',
-  'Prayer Alert',
   'Sunday School',
+  'Prayer Alert',
   'Attendance Follow-up',
   'Tithe Receipt',
   'General Announcement',
@@ -46,13 +58,23 @@ const VARIABLE_TAGS = [
   { tag: '{GroupName}', label: 'Group Name', desc: 'Target WhatsApp Group' },
   { tag: '{ChurchName}', label: 'Church Name', desc: 'Your church name' },
   { tag: '{City}', label: 'City', desc: 'Church location' },
+  { tag: '{ServiceName}', label: 'Service Name', desc: 'e.g. Sunday Resurrection Worship' },
   { tag: '{ServiceTime}', label: 'Service Time', desc: 'e.g. 9:00 AM IST' },
+  { tag: '{Location}', label: 'Location / Sanctuary', desc: 'e.g. Main Sanctuary' },
+  { tag: '{Speaker}', label: 'Speaker / Preacher', desc: 'e.g. Senior Pastor' },
+  { tag: '{LivestreamLink}', label: 'Live Stream URL', desc: 'e.g. YouTube / Live URL' },
+  { tag: '{ClassName}', label: 'Sunday School Class', desc: 'e.g. Little Lambs' },
+  { tag: '{TeacherName}', label: 'SS Teacher Name', desc: 'Class teacher' },
+  { tag: '{LessonTopic}', label: 'Lesson Topic', desc: 'e.g. David & Goliath' },
+  { tag: '{MemoryVerse}', label: 'Memory Verse', desc: 'Scripture verse of the week' },
+  { tag: '{PresentCount}', label: 'Present Count', desc: 'Number of attendees' },
+  { tag: '{AbsentCount}', label: 'Absent Count', desc: 'Number of absentees' },
+  { tag: '{Date}', label: 'Session Date', desc: 'e.g. 30 Aug 2026' },
   { tag: '{Amount}', label: 'Amount (₹)', desc: 'Tithe/offering figure' },
   { tag: '{FundName}', label: 'Fund Name', desc: 'e.g. Building Fund' },
   { tag: '{ReceiptNo}', label: 'Receipt No', desc: 'e.g. NCA-8801' },
   { tag: '{PrayerTitle}', label: 'Prayer Title', desc: 'Request subject' },
   { tag: '{PrayerDescription}', label: 'Prayer Note', desc: 'Details of prayer' },
-  { tag: '{MemoryVerse}', label: 'Memory Verse', desc: 'Sunday school verse' },
 ];
 
 export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
@@ -61,6 +83,12 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
   groups = [],
   currentChurch,
   canManageTemplates = true,
+  sundaySchoolClasses = [],
+  sundaySchoolStudents = [],
+  sundaySchoolAttendance = [],
+  churchSettings,
+  events = [],
+  attendance = [],
   onSaveTemplate,
   onDeleteTemplate,
   onSaveGroup,
@@ -69,10 +97,16 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
   const safeMembers = members || [];
   const safeTemplates = templates || [];
   const safeGroups = groups || [];
+  const safeSSClasses = sundaySchoolClasses || [];
+  const safeSSStudents = sundaySchoolStudents || [];
+  const safeSSAttendance = sundaySchoolAttendance || [];
+  const safeEvents = events || [];
 
-  // Active View Switcher: 'direct' (Individual Members) vs 'groups' (WhatsApp Groups)
-  const [activeTabMode, setActiveTabMode] = useState<'direct' | 'groups'>('direct');
+  // Active Main Tab Mode: 'composer' (Templates & Custom) | 'ss_auto' (Sunday School Automation) | 'service_auto' (Service Broadcast Automation) | 'groups' (Manage WhatsApp Groups)
+  const [activeTabMode, setActiveTabMode] = useState<'composer' | 'ss_auto' | 'service_auto' | 'groups'>('composer');
 
+  // Direct send vs group target selector
+  const [targetType, setTargetType] = useState<'direct' | 'group'>('group');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(safeTemplates[0]?.id || '');
   const [selectedMemberId, setSelectedMemberId] = useState<string>(safeMembers[0]?.id || '');
   const [selectedGroupId, setSelectedGroupId] = useState<string>(safeGroups[0]?.id || '');
@@ -83,16 +117,59 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
   const [searchMemberQuery, setSearchMemberQuery] = useState<string>('');
   const [searchGroupQuery, setSearchGroupQuery] = useState<string>('');
 
-  // Dynamic parameters
+  // -------------------------------------------------------------
+  // DYNAMIC PARAMETERS STATE
+  // -------------------------------------------------------------
+  const [serviceNameParam, setServiceNameParam] = useState('Sunday Resurrection Worship Service');
+  const [serviceTimeParam, setServiceTimeParam] = useState('9:00 AM & 10:45 AM IST');
+  const [locationParam, setLocationParam] = useState('Main Sanctuary');
+  const [speakerParam, setSpeakerParam] = useState(currentChurch?.pastorName || 'Senior Pastor');
+  const [livestreamParam, setLivestreamParam] = useState('https://youtube.com/@churchlive');
+  
+  // Sunday School params
+  const [ssClassParam, setSsClassParam] = useState(safeSSClasses[0]?.className || 'Little Lambs');
+  const [ssTeacherParam, setSsTeacherParam] = useState(safeSSClasses[0]?.teacherName || 'Sunday School Lead');
+  const [ssLessonParam, setSsLessonParam] = useState(safeSSClasses[0]?.currentLesson || 'David & Goliath: Courage in God');
+  const [ssVerseParam, setSsVerseParam] = useState(safeSSClasses[0]?.memoryVerse || '1 Samuel 17:45 - "I come against you in the name of the Lord Almighty."');
+  const [ssPresentCountParam, setSsPresentCountParam] = useState('12');
+  const [ssAbsentCountParam, setSsAbsentCountParam] = useState('2');
+  const [dateParam, setDateParam] = useState(() => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }));
+  
+  // Finance & Prayer params
   const [amountParam, setAmountParam] = useState('2500');
   const [fundParam, setFundParam] = useState('Tithe & Offering');
   const [receiptParam, setReceiptParam] = useState('NCA-IND-8801');
-  const [prayerTitleParam, setPrayerTitleParam] = useState('Surgical Recovery & Healing');
+  const [prayerTitleParam, setPrayerTitleParam] = useState('Surgical Recovery & Complete Healing');
   const [prayerDescParam, setPrayerDescParam] = useState('Please keep praying for complete victory and peace.');
-  const [serviceTimeParam, setServiceTimeParam] = useState('9:00 AM IST');
-  const [memoryVerseParam, setMemoryVerseParam] = useState('Ephesians 6:11 - Put on the full armor of God.');
 
-  // Modal State for Create / Edit Template
+  // -------------------------------------------------------------
+  // SUNDAY SCHOOL AUTOMATION STATE
+  // -------------------------------------------------------------
+  const [selectedSSClassId, setSelectedSSClassId] = useState<string>(safeSSClasses[0]?.id || '');
+  const [selectedSSRecordId, setSelectedSSRecordId] = useState<string>(safeSSAttendance[0]?.id || 'newest');
+  const [ssSummaryFormat, setSsSummaryFormat] = useState<'full_summary' | 'verse_challenge' | 'parent_update' | 'absentee_care'>('full_summary');
+
+  // -------------------------------------------------------------
+  // SERVICE BROADCAST AUTOMATION STATE
+  // -------------------------------------------------------------
+  const churchServicesList = useMemo(() => {
+    const fromSettings = churchSettings?.services?.filter(s => s.isActive !== false) || [];
+    if (fromSettings.length > 0) return fromSettings;
+    return [
+      { id: 'srv-1', name: 'Sunday Resurrection Worship Service', day: 'Sunday', startTime: '09:00 AM', location: 'Main Sanctuary' },
+      { id: 'srv-2', name: 'Sunday Evening Youth & Praise Service', day: 'Sunday', startTime: '06:00 PM', location: 'Youth Chapel' },
+      { id: 'srv-3', name: 'Wednesday Word & Intercessory Prayer', day: 'Wednesday', startTime: '07:00 PM', location: 'Main Sanctuary' },
+      { id: 'srv-4', name: 'Friday Bible Study & Fasting Fellowship', day: 'Friday', startTime: '10:30 AM', location: 'Fellowship Hall' },
+      { id: 'srv-5', name: 'Saturday Morning Dawn Prayer', day: 'Saturday', startTime: '06:00 AM', location: 'Prayer Room' }
+    ];
+  }, [churchSettings]);
+
+  const [selectedServiceId, setSelectedServiceId] = useState<string>(churchServicesList[0]?.id || 'srv-1');
+  const [serviceBroadcastType, setServiceBroadcastType] = useState<'sunday_service' | 'midweek_prayer' | 'youth_night' | 'livestream_alert' | 'post_service_followup'>('sunday_service');
+
+  // -------------------------------------------------------------
+  // MODALS STATE
+  // -------------------------------------------------------------
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState('');
@@ -101,7 +178,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
   const [modalText, setModalText] = useState('');
   const modalTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Modal State for Create / Edit WhatsApp Group
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [modalGroupName, setModalGroupName] = useState('');
@@ -116,17 +192,263 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
   const activeMember = safeMembers.find((m) => m.id === selectedMemberId) || safeMembers[0];
   const activeGroup = safeGroups.find((g) => g.id === selectedGroupId) || safeGroups[0];
 
-  // Open modal for Creating Template
+  // -------------------------------------------------------------
+  // AUTOMATED GENERATOR HANDLERS
+  // -------------------------------------------------------------
+
+  // 1. Generate Sunday School Summary
+  const handleGenerateSSSummary = () => {
+    const targetCls = safeSSClasses.find((c) => c.id === selectedSSClassId) || safeSSClasses[0];
+    const recordsForClass = safeSSAttendance.filter((a) => !targetCls || a.classId === targetCls.id);
+    const targetRecord = selectedSSRecordId === 'newest' 
+      ? recordsForClass[0] 
+      : recordsForClass.find((r) => r.id === selectedSSRecordId) || recordsForClass[0];
+
+    const clsName = targetCls?.className || 'Sunday School';
+    const teacherName = targetRecord?.recordedBy || targetCls?.teacherName || 'Sunday School Teacher';
+    const lesson = targetRecord?.lessonTaught || targetCls?.currentLesson || 'God\'s Love & Grace';
+    const verse = targetRecord?.memoryVerse || targetCls?.memoryVerse || 'John 3:16 - For God so loved the world.';
+    const presentCount = targetRecord?.presentStudentIds?.length || 8;
+    const absentCount = targetRecord?.absentStudentIds?.length || 2;
+    const guestCount = targetRecord?.guestCount || 0;
+    const dateStr = targetRecord?.date 
+      ? new Date(targetRecord.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    // Update dynamic params
+    setSsClassParam(clsName);
+    setSsTeacherParam(teacherName);
+    setSsLessonParam(lesson);
+    setSsVerseParam(verse);
+    setSsPresentCountParam(String(presentCount));
+    setSsAbsentCountParam(String(absentCount));
+    setDateParam(dateStr);
+
+    // Auto-select Sunday School Group if available
+    const ssGroup = safeGroups.find((g) => g.category === 'Sunday School' || g.name.toLowerCase().includes('sunday school'));
+    if (ssGroup) {
+      setSelectedGroupId(ssGroup.id);
+    }
+    setTargetType('group');
+
+    let generated = '';
+    if (ssSummaryFormat === 'full_summary') {
+      generated = `🌟 *${currentChurch.name} - Sunday School Weekly Attendance & Verse Summary*\n\n` +
+        `Dear Parents & Church Family,\n\n` +
+        `Praise God for a joyful, spirit-filled session today in *${clsName}* (${targetCls?.ageGroup || 'Children'})!\n\n` +
+        `📊 *Session Attendance Highlights (${dateStr}):*\n` +
+        `• Total Present: *${presentCount} children*\n` +
+        `• Absent: *${absentCount} children*\n` +
+        (guestCount > 0 ? `• First-Time Guests: *+${guestCount} children*\n` : '') +
+        `• Teacher / Leader: *${teacherName}*\n\n` +
+        `📖 *Lesson of the Week:*\n` +
+        `*${lesson}*\n\n` +
+        `📜 *Memory Verse to Practice at Home:*\n` +
+        `> "${verse}"\n\n` +
+        (targetRecord?.notes ? `📝 *Teacher's Note:* ${targetRecord.notes}\n\n` : '') +
+        `🎯 *Home Challenge:* Please recite this verse 3 times with your child before bed this week. Special badge awarded next Sunday for recitation!\n\n` +
+        `_“Train up a child in the way he should go, and when he is old he will not depart from it.” — Proverbs 22:6_\n\n` +
+        `Blessings,\n*${teacherName}* • ${currentChurch.name}`;
+    } else if (ssSummaryFormat === 'verse_challenge') {
+      generated = `📖 *Weekly Memory Verse Challenge | ${clsName}*\n\n` +
+        `Dear Parents of ${currentChurch.name},\n\n` +
+        `Here is this week's memory verse for our Sunday School students:\n\n` +
+        `✨ *"${verse}"*\n\n` +
+        `📚 *Lesson Theme:* ${lesson}\n` +
+        `🗓️ *Target Sunday:* Next Service\n\n` +
+        `🏆 *Challenge:* Practice this verse together as a family. Let's hide God's Word in our children's hearts!\n\n` +
+        `With prayers,\n*${teacherName}* • ${currentChurch.name}`;
+    } else if (ssSummaryFormat === 'parent_update') {
+      generated = `Dear {MemberName},\n\n` +
+        `Grace and peace! We are delighted that your child joined Sunday School today at *${currentChurch.name}* in *${clsName}*.\n\n` +
+        `📖 *Today's Lesson:* ${lesson}\n` +
+        `📜 *Memory Verse:* "${verse}"\n\n` +
+        `Thank you for encouraging your family in the Lord! Please practice this verse together at home this week.\n\n` +
+        `Blessings,\n*${teacherName}*`;
+      setTargetType('direct');
+    } else {
+      // Absentee care
+      generated = `Dear {MemberName},\n\n` +
+        `Warm greetings from *${currentChurch.name}* Sunday School! We missed having your child in *${clsName}* class today.\n\n` +
+        `Here is the lesson and memory verse so your child doesn't miss out:\n` +
+        `📖 *Lesson:* ${lesson}\n` +
+        `📜 *Memory Verse:* "${verse}"\n\n` +
+        `We prayed for you and look forward to seeing your family next Sunday!\n\n` +
+        `In Christ,\n*${teacherName}*`;
+      setTargetType('direct');
+    }
+
+    setCustomText(generated);
+  };
+
+  // 2. Generate Service Broadcast Reminder
+  const handleGenerateServiceBroadcast = () => {
+    const targetService = churchServicesList.find((s) => s.id === selectedServiceId) || churchServicesList[0];
+    const sName = targetService?.name || 'Sunday Worship Service';
+    const sTime = targetService?.startTime || '09:00 AM IST';
+    const sLoc = targetService?.location || 'Main Sanctuary';
+
+    setServiceNameParam(sName);
+    setServiceTimeParam(sTime);
+    setLocationParam(sLoc);
+
+    let generated = '';
+    if (serviceBroadcastType === 'sunday_service') {
+      const annGroup = safeGroups.find((g) => g.category === 'General' || g.name.toLowerCase().includes('announcement') || g.name.toLowerCase().includes('official'));
+      if (annGroup) setSelectedGroupId(annGroup.id);
+      setTargetType('group');
+
+      generated = `🔔 *${currentChurch.name} - Sunday Worship Service Reminder*\n\n` +
+        `Dear Church Family,\n\n` +
+        `Grace and peace to you in Christ Jesus! We invite you and your family to join us tomorrow as we gather for worship, praise, and an anointed message from God's Word.\n\n` +
+        `📍 *Service:* ${sName}\n` +
+        `⏰ *Time:* ${sTime}\n` +
+        `🏛️ *Sanctuary:* ${sLoc}, ${currentChurch.city || 'Church'}\n` +
+        `🎙️ *Speaker:* ${speakerParam}\n` +
+        `📖 *Theme:* ${ssVerseParam || 'Walking in New Creation Power'}\n\n` +
+        `📺 *Live Stream Link:* ${livestreamParam}\n\n` +
+        `_“I rejoiced with those who said to me, ‘Let us go to the house of the Lord.’” — Psalm 122:1_\n\n` +
+        `Come with expectant hearts. Bring a friend with you!\n\n` +
+        `In Christ's Love,\n*${currentChurch.name} Pastoral Team*`;
+    } else if (serviceBroadcastType === 'midweek_prayer') {
+      const prayerGroup = safeGroups.find((g) => g.category === 'Prayer Warriors' || g.name.toLowerCase().includes('prayer'));
+      if (prayerGroup) setSelectedGroupId(prayerGroup.id);
+      setTargetType('group');
+
+      generated = `🙏 *${currentChurch.name} - Midweek Word & Intercessory Prayer Gathering*\n\n` +
+        `Dear Church Family,\n\n` +
+        `Join us this Wednesday at *${sTime}* for an intimate time of Bible exposition and united churchwide prayer.\n\n` +
+        `📍 *Location:* ${sLoc}\n` +
+        `📖 *Topic:* In-Depth Scripture Study & Altar Intercession\n\n` +
+        `_“For where two or three gather in my name, there am I with them.” — Matthew 18:20_\n\n` +
+        `Submit your prayer requests or join us live!\n\n` +
+        `*${currentChurch.name}*`;
+    } else if (serviceBroadcastType === 'youth_night') {
+      const youthGroup = safeGroups.find((g) => g.category === 'Youth' || g.name.toLowerCase().includes('youth'));
+      if (youthGroup) setSelectedGroupId(youthGroup.id);
+      setTargetType('group');
+
+      generated = `🔥 *YOUTH FELLOWSHIP & PRAISE NIGHT | ${currentChurch.name}*\n\n` +
+        `Hey Youth & Young Adults!\n\n` +
+        `Get ready for an electrifying Youth Fellowship this Friday at *${sTime}*!\n\n` +
+        `📍 *Venue:* ${sLoc}\n` +
+        `🎸 *Praise & Worship:* Contemporary Band\n` +
+        `🎯 *Interactive Discussion:* Living Boldly for Christ in 2026\n` +
+        `🍕 *Followed by:* Refreshments & Games\n\n` +
+        `Tag a friend and see you there! Don't miss it!\n\n` +
+        `*${currentChurch.name} Youth Ministry*`;
+    } else if (serviceBroadcastType === 'livestream_alert') {
+      const annGroup = safeGroups.find((g) => g.category === 'General');
+      if (annGroup) setSelectedGroupId(annGroup.id);
+      setTargetType('group');
+
+      generated = `🔴 *WE ARE LIVE! ${sName} | ${currentChurch.name}*\n\n` +
+        `Our worship service has started! If you cannot be with us in person today, join our live broadcast stream now:\n\n` +
+        `📺 *Watch Live Stream:* ${livestreamParam}\n\n` +
+        `🎙️ *Speaker:* ${speakerParam}\n` +
+        `💬 Chat and drop your prayer requests in the comments!\n\n` +
+        `_May God's presence fill your home wherever you are watching._`;
+    } else {
+      // Post-service follow-up
+      setTargetType('direct');
+      generated = `Dear {MemberName},\n\n` +
+        `Warm blessings from *${currentChurch.name}*! We missed having you and your family with us at ${sName} today.\n\n` +
+        `You were in our thoughts and prayers during our service. If you need any prayer support or pastoral connection, please reply to this message anytime.\n\n` +
+        (livestreamParam ? `📺 You can catch the full service sermon replay here: ${livestreamParam}\n\n` : '') +
+        `May the Lord bless your upcoming week with joy and grace!\n\n` +
+        `In Christ,\n*${currentChurch.name} Pastoral Care Team*`;
+    }
+
+    setCustomText(generated);
+  };
+
+  // -------------------------------------------------------------
+  // MESSAGE RENDERING WITH PLACEHOLDERS
+  // -------------------------------------------------------------
+  const generateFinalMessage = (): string => {
+    let text = customText || activeTemplate?.templateText || '';
+
+    if (targetType === 'group') {
+      text = text.replace(/{MemberName}/g, activeGroup?.name || 'Beloved Church Family');
+      text = text.replace(/{GroupName}/g, activeGroup?.name || 'Church Group');
+    } else {
+      if (activeMember) {
+        text = text.replace(/{MemberName}/g, `${activeMember.firstName} ${activeMember.lastName}`);
+      } else {
+        text = text.replace(/{MemberName}/g, 'Church Member');
+      }
+      text = text.replace(/{GroupName}/g, 'Church Family');
+    }
+
+    text = text.replace(/{ChurchName}/g, currentChurch?.name || 'Church');
+    text = text.replace(/{City}/g, currentChurch?.city || 'City');
+    text = text.replace(/{ServiceName}/g, serviceNameParam);
+    text = text.replace(/{ServiceTime}/g, serviceTimeParam);
+    text = text.replace(/{Location}/g, locationParam);
+    text = text.replace(/{Speaker}/g, speakerParam);
+    text = text.replace(/{LivestreamLink}/g, livestreamParam);
+    text = text.replace(/{ClassName}/g, ssClassParam);
+    text = text.replace(/{TeacherName}/g, ssTeacherParam);
+    text = text.replace(/{LessonTopic}/g, ssLessonParam);
+    text = text.replace(/{MemoryVerse}/g, ssVerseParam);
+    text = text.replace(/{PresentCount}/g, ssPresentCountParam);
+    text = text.replace(/{AbsentCount}/g, ssAbsentCountParam);
+    text = text.replace(/{Date}/g, dateParam);
+    text = text.replace(/{Amount}/g, amountParam);
+    text = text.replace(/{FundName}/g, fundParam);
+    text = text.replace(/{ReceiptNo}/g, receiptParam);
+    text = text.replace(/{PrayerTitle}/g, prayerTitleParam);
+    text = text.replace(/{PrayerDescription}/g, prayerDescParam);
+
+    return text;
+  };
+
+  const finalMessage = generateFinalMessage();
+
+  const sanitizePhone = (ph: string): string => {
+    let clean = (ph || '').replace(/\D/g, '');
+    if (clean.length === 10) clean = '91' + clean; // default to India code +91
+    return clean;
+  };
+
+  const handleOpenWhatsApp = (phoneStr?: string) => {
+    const targetPhone = phoneStr ? sanitizePhone(phoneStr) : sanitizePhone(activeMember?.phone || '919840123456');
+    const encoded = encodeURIComponent(finalMessage);
+    const waUrl = `https://wa.me/${targetPhone}?text=${encoded}`;
+    window.open(waUrl, '_blank');
+  };
+
+  const handleShareToGroup = (customGroupLink?: string) => {
+    navigator.clipboard.writeText(finalMessage);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+
+    const encoded = encodeURIComponent(finalMessage);
+    const targetUrl = customGroupLink && customGroupLink.startsWith('http')
+      ? customGroupLink
+      : `https://api.whatsapp.com/send?text=${encoded}`;
+
+    window.open(targetUrl, '_blank');
+  };
+
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(finalMessage);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // -------------------------------------------------------------
+  // TEMPLATE & GROUP MODAL HANDLERS
+  // -------------------------------------------------------------
   const handleOpenCreateModal = () => {
     setEditingTemplateId(null);
     setModalTitle('');
     setModalCategory('Service Reminder');
     setModalCustomCategory('');
-    setModalText('Dear {MemberName}, peace and blessings from {ChurchName} in {City}!\n\nJoin us for service at {ServiceTime}.');
+    setModalText('🔔 *{ChurchName} - Sunday Service Reminder*\n\nDear {MemberName}, Join us for service at {ServiceTime} in {Location}. Theme: {MemoryVerse}.');
     setIsModalOpen(true);
   };
 
-  // Open modal for Editing Template
   const handleOpenEditModal = (tpl: WhatsAppReminderTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingTemplateId(tpl.id);
@@ -142,7 +464,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     setIsModalOpen(true);
   };
 
-  // Open modal for Creating Group
   const handleOpenCreateGroupModal = () => {
     setEditingGroupId(null);
     setModalGroupName('');
@@ -155,7 +476,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     setIsGroupModalOpen(true);
   };
 
-  // Open modal for Editing Group
   const handleOpenEditGroupModal = (grp: WhatsAppGroup, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingGroupId(grp.id);
@@ -169,7 +489,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     setIsGroupModalOpen(true);
   };
 
-  // Insert tag into modal textarea
   const handleInsertTag = (tag: string) => {
     if (!modalTextareaRef.current) {
       setModalText((prev) => prev + ' ' + tag);
@@ -186,7 +505,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     }, 50);
   };
 
-  // Save Modal Template (Create or Update)
   const handleSaveModalTemplate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalTitle.trim() || !modalText.trim()) {
@@ -216,7 +534,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     setIsModalOpen(false);
   };
 
-  // Save Modal WhatsApp Group (Create or Update)
   const handleSaveModalGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalGroupName.trim()) {
@@ -246,13 +563,10 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     setIsGroupModalOpen(false);
   };
 
-  // Delete Template
   const handleDeleteTemplate = (id: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Are you sure you want to permanently delete the template "${title}"?`)) {
-      if (onDeleteTemplate) {
-        onDeleteTemplate(id);
-      }
+    if (confirm(`Are you sure you want to delete "${title}"?`)) {
+      if (onDeleteTemplate) onDeleteTemplate(id);
       if (selectedTemplateId === id) {
         const remaining = safeTemplates.filter((t) => t.id !== id);
         if (remaining.length > 0) {
@@ -266,100 +580,27 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     }
   };
 
-  // Delete Group
   const handleDeleteGroup = (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm(`Are you sure you want to delete the WhatsApp group "${name}"?`)) {
-      if (onDeleteGroup) {
-        onDeleteGroup(id);
-      }
+      if (onDeleteGroup) onDeleteGroup(id);
       if (selectedGroupId === id) {
         const remaining = safeGroups.filter((g) => g.id !== id);
-        if (remaining.length > 0) {
-          setSelectedGroupId(remaining[0].id);
-        } else {
-          setSelectedGroupId('');
-        }
+        if (remaining.length > 0) setSelectedGroupId(remaining[0].id);
+        else setSelectedGroupId('');
       }
     }
   };
 
-  // Substitute placeholders into the message text
-  const generateFinalMessage = (): string => {
-    let text = customText || activeTemplate?.templateText || '';
-
-    if (activeTabMode === 'groups') {
-      text = text.replace(/{MemberName}/g, activeGroup?.name || 'Beloved Church Family');
-      text = text.replace(/{GroupName}/g, activeGroup?.name || 'Church Group');
-    } else {
-      if (activeMember) {
-        text = text.replace(/{MemberName}/g, `${activeMember.firstName} ${activeMember.lastName}`);
-      }
-      text = text.replace(/{GroupName}/g, 'Church Family');
-    }
-
-    text = text.replace(/{ChurchName}/g, currentChurch?.name || 'Church');
-    text = text.replace(/{City}/g, currentChurch?.city || 'City');
-    text = text.replace(/{ServiceTime}/g, serviceTimeParam);
-    text = text.replace(/{Amount}/g, amountParam);
-    text = text.replace(/{FundName}/g, fundParam);
-    text = text.replace(/{ReceiptNo}/g, receiptParam);
-    text = text.replace(/{PrayerTitle}/g, prayerTitleParam);
-    text = text.replace(/{PrayerDescription}/g, prayerDescParam);
-    text = text.replace(/{MemoryVerse}/g, memoryVerseParam);
-
-    return text;
-  };
-
-  const finalMessage = generateFinalMessage();
-
-  const sanitizePhone = (ph: string): string => {
-    let clean = (ph || '').replace(/\D/g, '');
-    if (clean.length === 10) clean = '91' + clean; // default to India country code +91
-    return clean;
-  };
-
-  const handleOpenWhatsApp = (phoneStr?: string) => {
-    const targetPhone = phoneStr ? sanitizePhone(phoneStr) : sanitizePhone(activeMember?.phone || '919840123456');
-    const encoded = encodeURIComponent(finalMessage);
-    const waUrl = `https://wa.me/${targetPhone}?text=${encoded}`;
-    window.open(waUrl, '_blank');
-  };
-
-  // Universal WhatsApp Broadcast / Group Share
-  const handleShareToGroup = (customGroupLink?: string) => {
-    // 1. Copy message to clipboard
-    navigator.clipboard.writeText(finalMessage);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
-
-    // 2. If group has a direct invite/chat link, offer opening it, or use universal WhatsApp send
-    const encoded = encodeURIComponent(finalMessage);
-    const targetUrl = customGroupLink && customGroupLink.startsWith('http')
-      ? customGroupLink
-      : `https://api.whatsapp.com/send?text=${encoded}`;
-
-    window.open(targetUrl, '_blank');
-  };
-
-  const handleCopyText = () => {
-    navigator.clipboard.writeText(finalMessage);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Filter templates
   const filteredTemplates = safeTemplates.filter((t) => {
     if (categoryFilter === 'All') return true;
     return t.category === categoryFilter;
   });
 
-  // Filter members for quick list
   const filteredMembers = safeMembers.filter((m) =>
     `${m.firstName || ''} ${m.lastName || ''} ${m.phone || ''} ${m.status || ''}`.toLowerCase().includes(searchMemberQuery.toLowerCase())
   );
 
-  // Filter groups
   const filteredGroups = safeGroups.filter((g) => {
     const matchCat = groupCategoryFilter === 'All' || g.category === groupCategoryFilter;
     const matchSearch = `${g.name} ${g.leaderName || ''} ${g.description || ''}`.toLowerCase().includes(searchGroupQuery.toLowerCase());
@@ -370,24 +611,19 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
     switch (cat) {
       case 'Service Reminder':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'Sunday School':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'Prayer Alert':
       case 'Prayer Warriors':
         return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'Sunday School':
-        return 'bg-amber-100 text-amber-900 border-amber-200';
       case 'Attendance Follow-up':
       case 'Youth':
-        return 'bg-rose-100 text-rose-800 border-rose-200';
+        return 'bg-amber-100 text-amber-900 border-amber-200';
       case 'Tithe Receipt':
         return 'bg-sky-100 text-sky-900 border-sky-200';
       case 'General Announcement':
       case 'General':
         return 'bg-teal-100 text-teal-800 border-teal-200';
-      case 'Event Invitation':
-      case 'Leadership':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Worship':
-        return 'bg-pink-100 text-pink-800 border-pink-200';
       default:
         return 'bg-slate-100 text-slate-800 border-slate-200';
     }
@@ -401,89 +637,386 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold mb-3 border border-emerald-500/30">
               <MessageSquare className="w-3.5 h-3.5" />
-              WhatsApp Reminders, Groups & Template Hub
+              WhatsApp Reminders & Automated Broadcast Hub
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              WhatsApp Broadcast & Group Messaging Hub
+              WhatsApp Messaging, Verse Summaries & Service Reminders
             </h2>
             <p className="text-emerald-100/80 text-sm mt-1 max-w-xl">
-              Send personalized reminders to church members or broadcast bulletins, prayer alerts, and youth notices directly to church WhatsApp groups.
+              Dispatch 1-click Sunday School attendance & memory verse summaries to parents, broadcast service reminders to church groups, and shepherd members with personalized pastoral care.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {activeTabMode === 'direct' ? (
-              <button
-                onClick={handleOpenCreateModal}
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-500/25 flex items-center gap-2 transition"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                New Template
-              </button>
-            ) : (
-              <button
-                onClick={handleOpenCreateGroupModal}
-                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-500/25 flex items-center gap-2 transition"
-              >
-                <Plus className="w-4 h-4 stroke-[3]" />
-                + Configure WhatsApp Group
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setActiveTabMode('ss_auto');
+                handleGenerateSSSummary();
+              }}
+              className="px-3.5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-purple-600/25 flex items-center gap-2 transition"
+            >
+              <GraduationCap className="w-4 h-4 stroke-[2.5]" />
+              SS Verse Summary
+            </button>
 
-            <div className="bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10 text-center shrink-0">
-              <span className="text-[10px] uppercase font-black text-emerald-300">
-                {activeTabMode === 'direct' ? 'Templates' : 'Groups'}
-              </span>
-              <p className="text-lg font-black text-white">
-                {activeTabMode === 'direct' ? safeTemplates.length : safeGroups.length}
-              </p>
-            </div>
+            <button
+              onClick={() => {
+                setActiveTabMode('service_auto');
+                handleGenerateServiceBroadcast();
+              }}
+              className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-amber-500/25 flex items-center gap-2 transition"
+            >
+              <Bell className="w-4 h-4 stroke-[2.5]" />
+              Service Reminder
+            </button>
+
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-3.5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-500/25 flex items-center gap-2 transition"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              New Template
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Target Mode Switcher: Member Direct vs WhatsApp Groups */}
+      {/* Main Navigation Tab Bar */}
       <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto no-scrollbar scrollbar-none">
         <button
-          onClick={() => setActiveTabMode('direct')}
-          className={`flex-1 min-w-[180px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 ${
-            activeTabMode === 'direct'
+          onClick={() => setActiveTabMode('composer')}
+          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 ${
+            activeTabMode === 'composer'
               ? 'bg-emerald-700 text-white shadow-sm'
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Users className="w-4 h-4 shrink-0" />
-          <span>Individual Member Direct Send</span>
+          <FileText className="w-4 h-4 shrink-0" />
+          <span>Composer & Templates ({safeTemplates.length})</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTabMode('ss_auto');
+            handleGenerateSSSummary();
+          }}
+          className={`flex-1 min-w-[210px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 ${
+            activeTabMode === 'ss_auto'
+              ? 'bg-purple-800 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4 shrink-0 text-purple-400" />
+          <span>Sunday School Verse & Attendance Summary</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTabMode('service_auto');
+            handleGenerateServiceBroadcast();
+          }}
+          className={`flex-1 min-w-[200px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 ${
+            activeTabMode === 'service_auto'
+              ? 'bg-amber-700 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Bell className="w-4 h-4 shrink-0 text-amber-300" />
+          <span>Service Broadcast Reminders</span>
         </button>
 
         <button
           onClick={() => setActiveTabMode('groups')}
-          className={`flex-1 min-w-[180px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[170px] py-2.5 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 ${
             activeTabMode === 'groups'
               ? 'bg-emerald-700 text-white shadow-sm'
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Layers className="w-4 h-4 shrink-0" />
-          <span>WhatsApp Group Broadcast Channels ({safeGroups.length})</span>
+          <span>WhatsApp Groups ({safeGroups.length})</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Controls & Templates/Groups Column */}
+        {/* Main Controls & Generator Column */}
         <div className="lg:col-span-2 space-y-5">
-          {/* ============================================================= */}
-          {/* 1. WHATSAPP GROUPS VIEW (IF GROUPS TAB ACTIVE) */}
-          {/* ============================================================= */}
+
+          {/* ========================================================================= */}
+          {/* TAB 1: SUNDAY SCHOOL ATTENDANCE & VERSE SUMMARY AUTO-GENERATOR */}
+          {/* ========================================================================= */}
+          {activeTabMode === 'ss_auto' && (
+            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-purple-200 shadow-sm space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold">
+                    <GraduationCap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
+                      Automated Sunday School Attendance & Verse Generator
+                    </h3>
+                    <p className="text-xs text-slate-500">Auto-pull attendance headcount, weekly lessons, and memory verses into WhatsApp</p>
+                  </div>
+                </div>
+
+                <span className="px-3 py-1 bg-purple-50 text-purple-800 border border-purple-200 text-xs font-extrabold rounded-xl">
+                  {safeSSClasses.length} Classes Available
+                </span>
+              </div>
+
+              {/* Class & Session Picker */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    1. Select Sunday School Class
+                  </label>
+                  <select
+                    value={selectedSSClassId}
+                    onChange={(e) => setSelectedSSClassId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-500"
+                  >
+                    {safeSSClasses.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.className} ({cls.ageGroup}) — Teacher: {cls.teacherName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    2. Select Attendance Session
+                  </label>
+                  <select
+                    value={selectedSSRecordId}
+                    onChange={(e) => setSelectedSSRecordId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="newest">Latest Recorded Session (Auto-detect)</option>
+                    {safeSSAttendance
+                      .filter((a) => !selectedSSClassId || a.classId === selectedSSClassId)
+                      .map((rec) => (
+                        <option key={rec.id} value={rec.id}>
+                          {rec.date} — {rec.presentStudentIds?.length || 0} Present • {rec.lessonTaught || 'Lesson'}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Summary Format Selector */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                  3. Select Message Format & Audience
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSsSummaryFormat('full_summary')}
+                    className={`p-3 rounded-2xl border text-left font-bold transition flex items-start gap-2.5 ${
+                      ssSummaryFormat === 'full_summary'
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 mt-0.5 ${ssSummaryFormat === 'full_summary' ? 'text-purple-700' : 'text-slate-400'}`} />
+                    <div>
+                      <div className="font-extrabold">Complete Class Broadcast</div>
+                      <p className="text-[11px] text-slate-500 font-normal mt-0.5">Headcount breakdown + Lesson + Memory Verse home action</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSsSummaryFormat('verse_challenge')}
+                    className={`p-3 rounded-2xl border text-left font-bold transition flex items-start gap-2.5 ${
+                      ssSummaryFormat === 'verse_challenge'
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <BookOpen className={`w-4 h-4 shrink-0 mt-0.5 ${ssSummaryFormat === 'verse_challenge' ? 'text-purple-700' : 'text-slate-400'}`} />
+                    <div>
+                      <div className="font-extrabold">Memory Verse Challenge</div>
+                      <p className="text-[11px] text-slate-500 font-normal mt-0.5">Focus on scripture recitation, bedtime challenge & badges</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSsSummaryFormat('parent_update')}
+                    className={`p-3 rounded-2xl border text-left font-bold transition flex items-start gap-2.5 ${
+                      ssSummaryFormat === 'parent_update'
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Users className={`w-4 h-4 shrink-0 mt-0.5 ${ssSummaryFormat === 'parent_update' ? 'text-purple-700' : 'text-slate-400'}`} />
+                    <div>
+                      <div className="font-extrabold">Direct Parent Note (Present)</div>
+                      <p className="text-[11px] text-slate-500 font-normal mt-0.5">Personalized thank you to individual parent for attendance</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSsSummaryFormat('absentee_care')}
+                    className={`p-3 rounded-2xl border text-left font-bold transition flex items-start gap-2.5 ${
+                      ssSummaryFormat === 'absentee_care'
+                        ? 'bg-purple-50 border-purple-500 text-purple-950 ring-2 ring-purple-400/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <HeartHandshake className={`w-4 h-4 shrink-0 mt-0.5 ${ssSummaryFormat === 'absentee_care' ? 'text-purple-700' : 'text-slate-400'}`} />
+                    <div>
+                      <div className="font-extrabold">Absentee Caring Check-in</div>
+                      <p className="text-[11px] text-slate-500 font-normal mt-0.5">We missed you note with verse so kids don't fall behind</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateSSSummary}
+                  className="px-5 py-3 bg-purple-700 hover:bg-purple-800 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-purple-700/20 flex items-center gap-2 transition"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  Generate & Populate WhatsApp Summary Now
+                </button>
+
+                <span className="text-[11px] text-purple-700 font-medium">
+                  ✓ Automatically formats emojis & bold scripture quotes
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 2: SERVICE BROADCAST REMINDER AUTO-GENERATOR */}
+          {/* ========================================================================= */}
+          {activeTabMode === 'service_auto' && (
+            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-amber-200 shadow-sm space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
+                      Automated Service Broadcast Reminder Generator
+                    </h3>
+                    <p className="text-xs text-slate-500">Generate high-engagement service bulletins, livestream links, and prayer reminders</p>
+                  </div>
+                </div>
+
+                <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-extrabold rounded-xl">
+                  {churchServicesList.length} Church Services
+                </span>
+              </div>
+
+              {/* Service & Preset Picker */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    1. Target Church Gathering
+                  </label>
+                  <select
+                    value={selectedServiceId}
+                    onChange={(e) => setSelectedServiceId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500"
+                  >
+                    {churchServicesList.map((srv) => (
+                      <option key={srv.id} value={srv.id}>
+                        {srv.name} — {srv.day} ({srv.startTime})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    2. Broadcast Timing / Theme
+                  </label>
+                  <select
+                    value={serviceBroadcastType}
+                    onChange={(e) => setServiceBroadcastType(e.target.value as any)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="sunday_service">Sunday Morning Worship Service Reminder</option>
+                    <option value="midweek_prayer">Wednesday Word & Intercessory Prayer</option>
+                    <option value="youth_night">Friday Youth Fellowship & Praise Night</option>
+                    <option value="livestream_alert">Live Now: YouTube / Stream Broadcast Alert</option>
+                    <option value="post_service_followup">Post-Service Absentee Care & Sermon Replay</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Custom Meta Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-amber-50/50 p-4 rounded-2xl border border-amber-100">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Speaker / Preacher</label>
+                  <input
+                    type="text"
+                    value={speakerParam}
+                    onChange={(e) => setSpeakerParam(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Livestream URL</label>
+                  <input
+                    type="text"
+                    value={livestreamParam}
+                    onChange={(e) => setLivestreamParam(e.target.value)}
+                    placeholder="https://youtube.com/@churchlive"
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Sanctuary Location</label>
+                  <input
+                    type="text"
+                    value={locationParam}
+                    onChange={(e) => setLocationParam(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateServiceBroadcast}
+                  className="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-amber-600/20 flex items-center gap-2 transition"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-200" />
+                  Generate & Populate Service Broadcast
+                </button>
+
+                <span className="text-[11px] text-amber-800 font-medium">
+                  ✓ Auto-links to target WhatsApp channels
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 3: WHATSAPP GROUPS VIEW */}
+          {/* ========================================================================= */}
           {activeTabMode === 'groups' && (
             <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
                     <Layers className="w-4 h-4 text-emerald-600" />
-                    Configured Church WhatsApp Groups
+                    Configured Church WhatsApp Broadcast Channels
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Select a church group channel to broadcast or configure custom groups</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Manage community channels for Sunday School, Youth, Prayer, and Leadership</p>
                 </div>
 
                 <button
@@ -491,7 +1024,7 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                   className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Add Group
+                  Add Group Channel
                 </button>
               </div>
 
@@ -529,23 +1062,26 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
               {/* Groups Grid */}
               {filteredGroups.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm font-semibold text-slate-600">No WhatsApp groups configured in this category.</p>
+                  <p className="text-sm font-semibold text-slate-600">No WhatsApp groups in this category.</p>
                   <button
                     onClick={handleOpenCreateGroupModal}
                     className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Configure First Group Now
+                    Configure First Group
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {filteredGroups.map((grp) => {
-                    const isSelected = grp.id === selectedGroupId;
+                    const isSelected = grp.id === selectedGroupId && targetType === 'group';
                     return (
                       <div
                         key={grp.id}
-                        onClick={() => setSelectedGroupId(grp.id)}
+                        onClick={() => {
+                          setSelectedGroupId(grp.id);
+                          setTargetType('group');
+                        }}
                         className={`p-3.5 rounded-2xl text-left border cursor-pointer transition flex flex-col justify-between group ${
                           isSelected
                             ? 'bg-emerald-50/90 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20'
@@ -594,8 +1130,8 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                         </div>
 
                         <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] font-semibold text-slate-400">
-                          <span>{grp.inviteLink ? '🔗 Invite Link Active' : 'Universal Share'}</span>
-                          {isSelected && <span className="text-emerald-700 font-bold flex items-center gap-1">Selected Target ✓</span>}
+                          <span>{grp.inviteLink ? '🔗 Direct Invite Link' : 'Universal Share'}</span>
+                          {isSelected && <span className="text-emerald-700 font-bold flex items-center gap-1">Active Target ✓</span>}
                         </div>
                       </div>
                     );
@@ -605,70 +1141,61 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
             </div>
           )}
 
-          {/* Template Selection & Management Card */}
-          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-emerald-600" />
-                  Choose WhatsApp Template
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Select a template or compose a message for your broadcast</p>
-              </div>
+          {/* ========================================================================= */}
+          {/* TEMPLATE SELECTION CARD (IN COMPOSER MODE) */}
+          {/* ========================================================================= */}
+          {activeTabMode === 'composer' && (
+            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    Choose WhatsApp Template Presets
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Select a pre-built reminder for Sunday School, Worship Service, or Pastoral Care</p>
+                </div>
 
-              <button
-                onClick={handleOpenCreateModal}
-                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 transition"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Template
-              </button>
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar text-xs">
-              <button
-                onClick={() => setCategoryFilter('All')}
-                className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
-                  categoryFilter === 'All'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                All ({safeTemplates.length})
-              </button>
-              {STANDARD_CATEGORIES.map((cat) => {
-                const count = safeTemplates.filter((t) => t.category === cat).length;
-                if (count === 0) return null;
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setCategoryFilter(cat)}
-                    className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
-                      categoryFilter === cat
-                        ? 'bg-emerald-600 text-white shadow-sm'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {cat} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Templates Grid */}
-            {filteredTemplates.length === 0 ? (
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-sm font-semibold text-slate-600">No templates found in this category.</p>
                 <button
                   onClick={handleOpenCreateModal}
-                  className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow hover:bg-emerald-700"
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 transition"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Create Template Now
+                  Add Template
                 </button>
               </div>
-            ) : (
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar text-xs">
+                <button
+                  onClick={() => setCategoryFilter('All')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
+                    categoryFilter === 'All'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All ({safeTemplates.length})
+                </button>
+                {STANDARD_CATEGORIES.map((cat) => {
+                  const count = safeTemplates.filter((t) => t.category === cat).length;
+                  if (count === 0) return null;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap ${
+                        categoryFilter === cat
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Templates Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {filteredTemplates.map((tpl) => {
                   const isSelected = tpl.id === selectedTemplateId;
@@ -727,34 +1254,53 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                   );
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Recipient & Message Customizer Card */}
+          {/* ========================================================================= */}
+          {/* ACTIVE MESSAGE BODY & BROADCAST TARGET CONTROLS */}
+          {/* ========================================================================= */}
           <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-              <Users className="w-4 h-4 text-emerald-600" />
-              {activeTabMode === 'direct' ? 'Recipient Member & Message Body' : 'Target WhatsApp Group & Message Body'}
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                <Send className="w-4 h-4 text-emerald-600" />
+                Target WhatsApp Destination & Message
+              </h3>
 
-            {activeTabMode === 'direct' ? (
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Recipient Church Member</label>
-                <select
-                  value={selectedMemberId}
-                  onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setTargetType('group')}
+                  className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
+                    targetType === 'group'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
                 >
-                  {safeMembers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.firstName} {m.lastName} ({m.phone}) — {m.status}
-                    </option>
-                  ))}
-                </select>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>WhatsApp Group</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetType('direct')}
+                  className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
+                    targetType === 'direct'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Direct Member</span>
+                </button>
               </div>
-            ) : (
+            </div>
+
+            {targetType === 'group' ? (
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Target Church WhatsApp Group</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Target Church WhatsApp Group Channel
+                </label>
                 <select
                   value={selectedGroupId}
                   onChange={(e) => setSelectedGroupId(e.target.value)}
@@ -767,130 +1313,51 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                   ))}
                 </select>
               </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Recipient Church Member (Direct Send)
+                </label>
+                <select
+                  value={selectedMemberId}
+                  onChange={(e) => setSelectedMemberId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {safeMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.firstName} {m.lastName} ({m.phone}) — {m.status}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
-            {/* Dynamic Placeholder Customizers */}
-            <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  Dynamic Message Parameters
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">Auto-populates placeholders in preview</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{'{ServiceTime}'}</label>
-                  <input
-                    type="text"
-                    value={serviceTimeParam}
-                    onChange={(e) => setServiceTimeParam(e.target.value)}
-                    className="w-full mt-0.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{'{Amount}'} / {'{FundName}'}</label>
-                  <div className="flex gap-1 mt-0.5">
-                    <input
-                      type="text"
-                      value={amountParam}
-                      onChange={(e) => setAmountParam(e.target.value)}
-                      className="w-1/3 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
-                    />
-                    <input
-                      type="text"
-                      value={fundParam}
-                      onChange={(e) => setFundParam(e.target.value)}
-                      className="w-2/3 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{'{ReceiptNo}'}</label>
-                  <input
-                    type="text"
-                    value={receiptParam}
-                    onChange={(e) => setReceiptParam(e.target.value)}
-                    className="w-full mt-0.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{'{PrayerTitle}'}</label>
-                  <input
-                    type="text"
-                    value={prayerTitleParam}
-                    onChange={(e) => setPrayerTitleParam(e.target.value)}
-                    className="w-full mt-0.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{'{MemoryVerse}'}</label>
-                  <input
-                    type="text"
-                    value={memoryVerseParam}
-                    onChange={(e) => setMemoryVerseParam(e.target.value)}
-                    className="w-full mt-0.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Custom Message Editor */}
+            {/* Live Message Textarea */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700">Editable Live Message Text</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCustomText(activeTemplate?.templateText || '')}
-                    className="text-[11px] font-bold text-rose-600 hover:underline"
-                  >
-                    Reset
-                  </button>
-                </div>
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <span>Editable WhatsApp Message Text</span>
+                  <span className="text-[10px] text-slate-400 font-normal">(Formatting with *bold*, _italics_, &gt; quote supported)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setCustomText(activeTemplate?.templateText || '')}
+                  className="text-[11px] font-bold text-rose-600 hover:underline"
+                >
+                  Reset
+                </button>
               </div>
               <textarea
-                rows={5}
+                rows={7}
                 value={customText || activeTemplate?.templateText || ''}
                 onChange={(e) => setCustomText(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono leading-relaxed"
+                placeholder="Compose your WhatsApp message..."
               />
             </div>
 
-            {/* Direct Action Buttons */}
-            {activeTabMode === 'direct' ? (
-              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
-                <button
-                  onClick={() => handleOpenWhatsApp()}
-                  className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2.5 transition min-w-0"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-emerald-700/80 flex items-center justify-center shrink-0">
-                    <Send className="w-4 h-4 text-white shrink-0" />
-                  </div>
-                  <div className="text-left truncate min-w-0">
-                    <div className="text-xs sm:text-sm font-black leading-tight">Send via WhatsApp</div>
-                    {activeMember && (
-                      <div className="text-[11px] font-medium text-emerald-100/90 truncate">
-                        to {activeMember.firstName} {activeMember.lastName} • {activeMember.phone}
-                      </div>
-                    )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={handleCopyText}
-                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-2xl border border-slate-200 flex items-center justify-center gap-2 transition shrink-0"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-600 shrink-0" /> : <Copy className="w-4 h-4 text-slate-600 shrink-0" />}
-                  <span>{copied ? 'Copied!' : 'Copy Text'}</span>
-                </button>
-              </div>
-            ) : (
+            {/* Quick Action Dispatch Buttons */}
+            {targetType === 'group' ? (
               <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
                 <button
                   onClick={() => handleShareToGroup(activeGroup?.inviteLink)}
@@ -928,36 +1395,63 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                   <span>{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
               </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-2">
+                <button
+                  onClick={() => handleOpenWhatsApp()}
+                  className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2.5 transition min-w-0"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-emerald-700/80 flex items-center justify-center shrink-0">
+                    <Send className="w-4 h-4 text-white shrink-0" />
+                  </div>
+                  <div className="text-left truncate min-w-0">
+                    <div className="text-xs sm:text-sm font-black leading-tight">Send via WhatsApp</div>
+                    {activeMember && (
+                      <div className="text-[11px] font-medium text-emerald-100/90 truncate">
+                        to {activeMember.firstName} {activeMember.lastName} • {activeMember.phone}
+                      </div>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleCopyText}
+                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-2xl border border-slate-200 flex items-center justify-center gap-2 transition shrink-0"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-600 shrink-0" /> : <Copy className="w-4 h-4 text-slate-600 shrink-0" />}
+                  <span>{copied ? 'Copied!' : 'Copy Text'}</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
 
-        {/* WhatsApp Mobile Chat Preview Column */}
+        {/* Live Mobile Chat Preview Column */}
         <div className="lg:col-span-1 space-y-5">
           <div className="bg-emerald-950 p-4 rounded-3xl border border-emerald-800 text-white shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-emerald-800 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-emerald-700 text-white font-extrabold flex items-center justify-center text-xs shadow-inner">
-                  {activeTabMode === 'groups' ? (activeGroup?.name.charAt(0) || 'G') : currentChurch.name.charAt(0)}
+                  {targetType === 'group' ? (activeGroup?.name.charAt(0) || 'G') : currentChurch.name.charAt(0)}
                 </div>
                 <div className="min-w-0">
                   <h4 className="text-xs font-bold text-white leading-tight truncate">
-                    {activeTabMode === 'groups' ? (activeGroup?.name || 'WhatsApp Group') : currentChurch.name}
+                    {targetType === 'group' ? (activeGroup?.name || 'WhatsApp Group') : currentChurch.name}
                   </h4>
                   <p className="text-[10px] text-emerald-300 truncate">
-                    {activeTabMode === 'groups' ? `${activeGroup?.memberCount || 25} participants • Official Channel` : 'WhatsApp Official Notice'}
+                    {targetType === 'group' ? `${activeGroup?.memberCount || 25} participants • Official Channel` : 'WhatsApp Official Notice'}
                   </p>
                 </div>
               </div>
               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-700 shrink-0">
-                {activeTabMode === 'groups' ? 'Group Preview' : 'Preview'}
+                {targetType === 'group' ? 'Group Live' : 'Direct Live'}
               </span>
             </div>
 
             {/* Chat Bubble Container */}
-            <div className="bg-[#0b141a] p-4 rounded-2xl min-h-[260px] border border-emerald-900/50 flex flex-col justify-end">
-              <div className="bg-[#005c4b] text-emerald-50 p-3.5 rounded-2xl rounded-tr-none text-xs space-y-2 shadow-md max-w-[95%] ml-auto">
-                <p className="whitespace-pre-wrap leading-relaxed">{finalMessage}</p>
+            <div className="bg-[#0b141a] p-4 rounded-2xl min-h-[300px] border border-emerald-900/50 flex flex-col justify-end">
+              <div className="bg-[#005c4b] text-emerald-50 p-3.5 rounded-2xl rounded-tr-none text-xs space-y-2 shadow-md max-w-[96%] ml-auto">
+                <p className="whitespace-pre-wrap leading-relaxed font-sans">{finalMessage}</p>
                 <div className="flex items-center justify-end gap-1 text-[9px] text-emerald-300 font-mono">
                   <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   <span className="text-sky-400 font-bold">✓✓</span>
@@ -966,45 +1460,8 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
             </div>
           </div>
 
-          {/* Quick Direct Target List (Members or Groups) */}
-          {activeTabMode === 'direct' ? (
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Quick Direct Send</h4>
-                <span className="text-[10px] text-slate-400">{filteredMembers.length} Members</span>
-              </div>
-
-              <input
-                type="text"
-                placeholder="Search member name or phone..."
-                value={searchMemberQuery}
-                onChange={(e) => setSearchMemberQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {filteredMembers.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition">
-                    <div className="min-w-0 pr-2">
-                      <p className="text-xs font-bold text-slate-900 truncate">{m.firstName} {m.lastName}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{m.phone}</p>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setSelectedMemberId(m.id);
-                        handleOpenWhatsApp(m.phone);
-                      }}
-                      className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold shadow shrink-0"
-                      title={`Send template to ${m.firstName}`}
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
+          {/* Quick Target List */}
+          {targetType === 'group' ? (
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Church Group Channels</h4>
@@ -1024,7 +1481,7 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
 
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
                 {filteredGroups.map((g) => (
                   <div key={g.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition">
                     <div className="min-w-0 pr-2">
@@ -1036,6 +1493,7 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                       <button
                         onClick={() => {
                           setSelectedGroupId(g.id);
+                          setTargetType('group');
                           handleShareToGroup(g.inviteLink);
                         }}
                         className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold shadow"
@@ -1044,6 +1502,44 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                         <Send className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Quick Direct Send</h4>
+                <span className="text-[10px] text-slate-400">{filteredMembers.length} Members</span>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Search member name or phone..."
+                value={searchMemberQuery}
+                onChange={(e) => setSearchMemberQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+
+              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                {filteredMembers.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs font-bold text-slate-900 truncate">{m.firstName} {m.lastName}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{m.phone}</p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedMemberId(m.id);
+                        setTargetType('direct');
+                        handleOpenWhatsApp(m.phone);
+                      }}
+                      className="p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold shadow shrink-0"
+                      title={`Send template to ${m.firstName}`}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1080,7 +1576,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
             </div>
 
             <form onSubmit={handleSaveModalTemplate} className="space-y-4">
-              {/* Title */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Template Title *</label>
                 <input
@@ -1093,7 +1588,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 />
               </div>
 
-              {/* Category */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
                 <select
@@ -1123,7 +1617,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 </div>
               )}
 
-              {/* Tag Quick-Insert Bar */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">Insert Dynamic Tags</label>
                 <div className="flex flex-wrap gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200 max-h-32 overflow-y-auto">
@@ -1141,7 +1634,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 </div>
               </div>
 
-              {/* Template Body */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Message Text Template *</label>
                 <textarea
@@ -1158,7 +1650,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 </p>
               </div>
 
-              {/* Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -1208,7 +1699,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
             </div>
 
             <form onSubmit={handleSaveModalGroup} className="space-y-4">
-              {/* Group Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp Group Name *</label>
                 <input
@@ -1221,7 +1711,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 />
               </div>
 
-              {/* Group Category & Leader */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Group Ministry / Category</label>
@@ -1250,7 +1739,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 </div>
               </div>
 
-              {/* WhatsApp Invite Link */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                   <span>WhatsApp Group Invite Link (Optional)</span>
@@ -1268,7 +1756,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 </div>
               </div>
 
-              {/* Estimated Member Count & Color */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Estimated Member Count</label>
@@ -1295,7 +1782,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Group Purpose & Description</label>
                 <textarea
@@ -1307,7 +1793,6 @@ export const WhatsAppHub: React.FC<WhatsAppHubProps> = ({
                 />
               </div>
 
-              {/* Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"

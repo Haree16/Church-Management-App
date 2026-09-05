@@ -5,12 +5,15 @@ import {
   Upload, Camera, Image as ImageIcon, Sparkles, RefreshCw, Check, Link as LinkIcon, CheckCircle2
 } from 'lucide-react';
 import { UserAvatar } from './common/UserAvatar';
+import { DuplicateMemberCheckModal } from './people/DuplicateMemberCheckModal';
 
 interface MemberFormModalProps {
   isOpen: boolean;
   member: Member | null; // null if creating
+  existingMembers?: Member[];
   onClose: () => void;
   onSave: (member: Member) => void;
+  onSelectExistingMember?: (member: Member) => void;
   currentChurchId?: string;
   ministries?: ChurchMinistry[];
 }
@@ -94,8 +97,10 @@ const compressImageFile = (file: File): Promise<string> => {
 export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   isOpen,
   member,
+  existingMembers = [],
   onClose,
   onSave,
+  onSelectExistingMember,
   currentChurchId,
   ministries = [],
 }) => {
@@ -112,6 +117,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const [joinedDate, setJoinedDate] = useState(new Date().toISOString().split('T')[0]);
   const [birthdate, setBirthdate] = useState('');
   const [pastoralNotes, setPastoralNotes] = useState('');
+
+  // Duplicate Check State
+  const [duplicateCandidates, setDuplicateCandidates] = useState<Member[]>([]);
+  const [pendingSavedMember, setPendingSavedMember] = useState<Member | null>(null);
 
   // Dynamic available ministry roles
   const availableMinistryRoles = useMemo(() => {
@@ -308,6 +317,32 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       createdAt: member ? member.createdAt : new Date().toISOString()
     };
 
+    // Duplicate member check when creating new member
+    if (!member && existingMembers && existingMembers.length > 0) {
+      const normPhone = phone.trim().replace(/\D/g, '');
+      const normEmail = email.trim().toLowerCase();
+      const normName = `${firstName.trim()} ${lastName.trim()}`.toLowerCase();
+
+      const duplicates = existingMembers.filter((m) => {
+        if (m.id === savedMember.id) return false;
+        const mPhone = (m.phone || '').replace(/\D/g, '');
+        const mEmail = (m.email || '').toLowerCase();
+        const mName = `${m.firstName || ''} ${m.lastName || ''}`.trim().toLowerCase();
+
+        const phoneMatch = normPhone.length >= 7 && mPhone.length >= 7 && (normPhone === mPhone || normPhone.endsWith(mPhone) || mPhone.endsWith(normPhone));
+        const emailMatch = normEmail.length >= 4 && mEmail.length >= 4 && normEmail === mEmail;
+        const nameMatch = normName.length >= 3 && mName.length >= 3 && normName === mName;
+
+        return Boolean(phoneMatch || emailMatch || nameMatch);
+      });
+
+      if (duplicates.length > 0 && duplicateCandidates.length === 0) {
+        setPendingSavedMember(savedMember);
+        setDuplicateCandidates(duplicates);
+        return;
+      }
+    }
+
     onSave(savedMember);
     onClose();
   };
@@ -315,6 +350,33 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   const initials = `${firstName[0] || 'M'}${lastName[0] || 'D'}`;
 
   return (
+    <>
+      {duplicateCandidates.length > 0 && pendingSavedMember && (
+        <DuplicateMemberCheckModal
+          isOpen={true}
+          duplicateCandidates={duplicateCandidates}
+          onClose={() => {
+            setDuplicateCandidates([]);
+            setPendingSavedMember(null);
+          }}
+          onProceedAnyway={() => {
+            if (pendingSavedMember) {
+              onSave(pendingSavedMember);
+              setDuplicateCandidates([]);
+              setPendingSavedMember(null);
+              onClose();
+            }
+          }}
+          onReviewExisting={(existing: Member) => {
+            setDuplicateCandidates([]);
+            setPendingSavedMember(null);
+            onClose();
+            if (onSelectExistingMember) {
+              onSelectExistingMember(existing);
+            }
+          }}
+        />
+      )}
     <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col my-auto">
         {/* Modal Header */}
@@ -820,5 +882,6 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         </form>
       </div>
     </div>
+    </>
   );
 };

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { SundaySchoolClass, SundaySchoolStudent, SundaySchoolAttendanceRecord, SaaSUser } from '../types';
+import { SundaySchoolClass, SundaySchoolStudent, SundaySchoolAttendanceRecord, SaaSUser, WhatsAppGroup } from '../types';
 import { 
-  GraduationCap, Award, BookOpen, UserPlus, Phone, MessageSquare, 
+  GraduationCap, Award, BookOpen, UserPlus, Phone, MessageSquare, Send, Copy, Share2, 
   Check, Sparkles, Plus, AlertCircle, Trash2, AlertTriangle, Edit3, Save, X,
   ClipboardCheck, Calendar, Users, CheckCircle2, XCircle, History, UserCheck,
-  Smile, ExternalLink, FileText, ChevronRight
+  Smile, ExternalLink, FileText, ChevronRight, HeartHandshake
 } from 'lucide-react';
 import { UserAvatar } from './common/UserAvatar';
 
@@ -12,6 +12,7 @@ interface SundaySchoolManagerProps {
   classes?: SundaySchoolClass[];
   students?: SundaySchoolStudent[];
   attendanceRecords?: SundaySchoolAttendanceRecord[];
+  groups?: WhatsAppGroup[];
   currentChurchId?: string;
   churchName?: string;
   currentUser?: SaaSUser | null;
@@ -31,6 +32,7 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
   classes = [],
   students = [],
   attendanceRecords = [],
+  groups = [],
   currentChurchId = 'church-1',
   churchName = 'New Creation Assembly Church',
   currentUser,
@@ -96,6 +98,116 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
   const safeClasses = classes || [];
   const safeStudents = students || [];
   const safeAttendance = attendanceRecords || [];
+  const safeGroups = groups || [];
+  const [isSSWhatsAppModalOpen, setIsSSWhatsAppModalOpen] = useState(false);
+  const [activeSummaryRecord, setActiveSummaryRecord] = useState<SundaySchoolAttendanceRecord | null>(null);
+  const [activeSummaryClass, setActiveSummaryClass] = useState<SundaySchoolClass | null>(null);
+  const [ssSummaryMode, setSsSummaryMode] = useState<'full_summary' | 'verse_challenge' | 'absentee_care'>('full_summary');
+  const [selectedTargetGroupId, setSelectedTargetGroupId] = useState<string>('');
+  const [ssWhatsAppText, setSsWhatsAppText] = useState('');
+  const [ssCopied, setSsCopied] = useState(false);
+
+  const getTargetSSGroup = () => {
+    return safeGroups.find((g) => g.category === 'Sunday School' || g.name.toLowerCase().includes('sunday school')) || safeGroups[0];
+  };
+
+  const generateSSBroadcastMessage = (
+    cls: SundaySchoolClass | undefined,
+    record: SundaySchoolAttendanceRecord | null,
+    mode: 'full_summary' | 'verse_challenge' | 'absentee_care'
+  ): string => {
+    const classNameStr = cls?.className || record?.className || 'Sunday School';
+    const teacherStr = record?.recordedBy || cls?.teacherName || 'Sunday School Teacher';
+    const lessonStr = record?.lessonTaught || cls?.currentLesson || 'God is Love';
+    const verseStr = record?.memoryVerse || cls?.memoryVerse || 'John 3:16';
+    const dateStr = record?.date
+      ? new Date(record.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const presentCount = record?.presentStudentIds?.length || 0;
+    const absentCount = record?.absentStudentIds?.length || 0;
+    const guestCount = record?.guestCount || 0;
+
+    if (mode === 'full_summary') {
+      return `🌟 *${churchName} - Sunday School Weekly Attendance & Verse Summary*\n\n` +
+        `Dear Parents & Church Family,\n\n` +
+        `Praise the Lord for a joyful and blessed Sunday School session today in *${classNameStr}* (${cls?.ageGroup || 'Children'})!\n\n` +
+        `📊 *Session Overview (${dateStr}):*\n` +
+        `• Total Present: *${presentCount} children*\n` +
+        `• Absent: *${absentCount} children*\n` +
+        (guestCount > 0 ? `• First-Time Guests: *+${guestCount} children*\n` : '') +
+        `• Teacher / Leader: *${teacherStr}*\n\n` +
+        `📖 *Lesson of the Week:*\n` +
+        `*${lessonStr}*\n\n` +
+        `📜 *Memory Verse of the Week:*\n` +
+        `> "${verseStr}"\n\n` +
+        (record?.notes ? `📝 *Teacher's Note:* ${record.notes}\n\n` : '') +
+        `🎯 *Home Action:* Please practice this verse with your child at home this week! Children who recite next Sunday will receive a badge.\n\n` +
+        `_“Train up a child in the way he should go, and when he is old he will not depart from it.” — Proverbs 22:6_\n\n` +
+        `Blessings,\n*${teacherStr}* • ${churchName}`;
+    } else if (mode === 'verse_challenge') {
+      return `📖 *Weekly Memory Verse Challenge | ${classNameStr}*\n\n` +
+        `Dear Parents of ${churchName},\n\n` +
+        `Here is this week's memory verse for our Sunday School students:\n\n` +
+        `✨ *"${verseStr}"*\n\n` +
+        `📚 *Lesson Theme:* ${lessonStr}\n` +
+        `🗓️ *Target Sunday:* Next Sunday Service\n\n` +
+        `🏆 *Challenge:* Please practice reciting this verse 3 times before bed with your child each night. Let's hide God's Word in their hearts!\n\n` +
+        `With prayers,\n*${teacherStr}* • ${churchName}`;
+    } else {
+      return `Dear Parents of ${churchName},\n\n` +
+        `Warm greetings from *${churchName}* Sunday School! We missed having your child in *${classNameStr}* class today.\n\n` +
+        `Here is today's lesson and memory verse so your child can stay on track at home:\n` +
+        `📖 *Lesson:* ${lessonStr}\n` +
+        `📜 *Memory Verse:* "${verseStr}"\n\n` +
+        `We prayed for you and your family today and look forward to seeing you next Sunday!\n\n` +
+        `In Christ,\n*${teacherStr}*`;
+    }
+  };
+
+  const handleOpenSSWhatsAppModal = (
+    record: SundaySchoolAttendanceRecord | null,
+    targetClass?: SundaySchoolClass,
+    initialMode: 'full_summary' | 'verse_challenge' | 'absentee_care' = 'full_summary'
+  ) => {
+    const cls = targetClass || safeClasses.find((c) => c.id === record?.classId) || activeClass;
+    setActiveSummaryRecord(record);
+    setActiveSummaryClass(cls || null);
+    setSsSummaryMode(initialMode);
+
+    const defaultGroup = getTargetSSGroup();
+    setSelectedTargetGroupId(defaultGroup?.id || safeGroups[0]?.id || '');
+
+    const msg = generateSSBroadcastMessage(cls, record, initialMode);
+    setSsWhatsAppText(msg);
+    setIsSSWhatsAppModalOpen(true);
+  };
+
+  const handleSummaryModeChange = (newMode: 'full_summary' | 'verse_challenge' | 'absentee_care') => {
+    setSsSummaryMode(newMode);
+    const msg = generateSSBroadcastMessage(activeSummaryClass || activeClass, activeSummaryRecord, newMode);
+    setSsWhatsAppText(msg);
+  };
+
+  const handleDispatchSSWhatsApp = () => {
+    navigator.clipboard.writeText(ssWhatsAppText);
+    setSsCopied(true);
+    setTimeout(() => setSsCopied(false), 3000);
+
+    const targetGroup = safeGroups.find((g) => g.id === selectedTargetGroupId) || getTargetSSGroup();
+    const encoded = encodeURIComponent(ssWhatsAppText);
+    const targetUrl = targetGroup?.inviteLink && targetGroup.inviteLink.startsWith('http')
+      ? targetGroup.inviteLink
+      : `https://api.whatsapp.com/send?text=${encoded}`;
+
+    window.open(targetUrl, '_blank');
+  };
+
+  const handleCopySSWhatsAppText = () => {
+    navigator.clipboard.writeText(ssWhatsAppText);
+    setSsCopied(true);
+    setTimeout(() => setSsCopied(false), 2000);
+  };
+
   
   const activeClass = safeClasses.find((c) => c.id === selectedClassId) || safeClasses[0];
   const classStudents = safeStudents.filter((s) => s.classId === activeClass?.id);
@@ -483,14 +595,25 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
                   <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 flex items-center gap-1">
                     <BookOpen className="w-3 h-3 text-purple-600" /> Memory Verse of the Week
                   </span>
-                  {canManageSundaySchool && (
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleOpenEditClassModal(activeClass)}
-                      className="text-[10px] font-bold text-purple-700 hover:text-purple-900 underline"
+                      onClick={() => handleOpenSSWhatsAppModal(null, activeClass, 'verse_challenge')}
+                      className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded-lg border border-emerald-300 transition"
+                      title="Broadcast this weekly memory verse to parents on WhatsApp"
                     >
-                      Edit Verse
+                      <MessageSquare className="w-3 h-3 text-emerald-700" />
+                      <span>WhatsApp Verse</span>
                     </button>
-                  )}
+
+                    {canManageSundaySchool && (
+                      <button
+                        onClick={() => handleOpenEditClassModal(activeClass)}
+                        className="text-[10px] font-bold text-purple-700 hover:text-purple-900 underline"
+                      >
+                        Edit Verse
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs font-bold text-purple-950 mt-1 italic">"{activeClass.memoryVerse}"</p>
                 <p className="text-[10px] text-purple-700 mt-1 font-semibold">Lesson: {activeClass.currentLesson}</p>
@@ -738,6 +861,15 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleOpenSSWhatsAppModal(record, undefined, 'full_summary')}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
+                            title="Send Automated Sunday School Attendance & Verse Summary to WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>WhatsApp Summary</span>
+                          </button>
+
                           <button
                             onClick={() => setViewingAttendanceRecord(record)}
                             className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs rounded-xl border border-purple-200 transition flex items-center gap-1"
@@ -1135,12 +1267,26 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
               </div>
             )}
 
-            <button
-              onClick={() => setViewingAttendanceRecord(null)}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
-            >
-              Close
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  const rec = viewingAttendanceRecord;
+                  setViewingAttendanceRecord(null);
+                  handleOpenSSWhatsAppModal(rec, undefined, 'full_summary');
+                }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center justify-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Broadcast Summary to WhatsApp</span>
+              </button>
+
+              <button
+                onClick={() => setViewingAttendanceRecord(null)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1535,7 +1681,152 @@ export const SundaySchoolManager: React.FC<SundaySchoolManagerProps> = ({
           </div>
         </div>
       )}
+    
+      {/* MODAL: SUNDAY SCHOOL WHATSAPP SUMMARY & VERSE BROADCAST */}
+      {isSSWhatsAppModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 border border-slate-200 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Sunday School WhatsApp Summary & Verse Broadcast
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Auto-formatted bulletin for {activeSummaryClass?.className || activeClass?.className || 'Sunday School'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsSSWhatsAppModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Switcher Tabs */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => handleSummaryModeChange('full_summary')}
+                className={`flex-1 py-2 px-2.5 rounded-xl transition flex items-center justify-center gap-1.5 text-center ${
+                  ssSummaryMode === 'full_summary'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Attendance Summary</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSummaryModeChange('verse_challenge')}
+                className={`flex-1 py-2 px-2.5 rounded-xl transition flex items-center justify-center gap-1.5 text-center ${
+                  ssSummaryMode === 'verse_challenge'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Verse Challenge</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSummaryModeChange('absentee_care')}
+                className={`flex-1 py-2 px-2.5 rounded-xl transition flex items-center justify-center gap-1.5 text-center ${
+                  ssSummaryMode === 'absentee_care'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <HeartHandshake className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Absentee Recap</span>
+              </button>
+            </div>
+
+            {/* Target WhatsApp Group */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                Target Church WhatsApp Group Channel
+              </label>
+              <select
+                value={selectedTargetGroupId}
+                onChange={(e) => setSelectedTargetGroupId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {safeGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.category}) — {g.memberCount || 25} Members
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Formatted Message Preview / Editor */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">
+                  Formatted WhatsApp Message
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const msg = generateSSBroadcastMessage(activeSummaryClass || activeClass, activeSummaryRecord, ssSummaryMode);
+                    setSsWhatsAppText(msg);
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline"
+                >
+                  Reset Text
+                </button>
+              </div>
+
+              <textarea
+                rows={8}
+                value={ssWhatsAppText}
+                onChange={(e) => setSsWhatsAppText(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleDispatchSSWhatsApp}
+                className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+              >
+                <Send className="w-4 h-4" />
+                <span>Broadcast to WhatsApp Group</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopySSWhatsAppText}
+                className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 transition"
+              >
+                {ssCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
+                <span>{ssCopied ? 'Copied!' : 'Copy Text'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSSWhatsAppModalOpen(false)}
+                className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
-

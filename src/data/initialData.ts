@@ -151,7 +151,173 @@ export const MINISTRY_TEAMS: MinistryTeamInfo[] = [
   }
 ];
 
-export const INITIAL_ROSTER: RosterAssignment[] = [];
+export const INITIAL_ROSTER: RosterAssignment[] = [
+  // Sunday Service (30 Aug 2026)
+  {
+    id: 'rost-sun-1',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-08-30',
+    serviceName: 'Sunday Morning Worship (9:00 AM)',
+    roleName: 'Worship Leader',
+    team: 'Worship & Music',
+    memberId: 'mem-1',
+    memberName: 'David Raj',
+    confirmed: true,
+    createdByName: 'Senior Pastor',
+  },
+  {
+    id: 'rost-sun-2',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-08-30',
+    serviceName: 'Sunday Morning Worship (9:00 AM)',
+    roleName: 'Acoustic Guitarist',
+    team: 'Worship & Music',
+    memberId: 'mem-2',
+    memberName: 'Priya Sharma',
+    confirmed: true,
+    createdByName: 'Worship Leader',
+  },
+  {
+    id: 'rost-sun-3',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-08-30',
+    serviceName: 'Sunday Morning Worship (9:00 AM)',
+    roleName: 'Head Usher & Greeter',
+    team: 'Ushering & Hospitality',
+    memberId: 'mem-3',
+    memberName: 'Samuel Kumar',
+    confirmed: false,
+    createdByName: 'Usher Lead',
+  },
+  {
+    id: 'rost-sun-4',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-08-30',
+    serviceName: 'Sunday Morning Worship (9:00 AM)',
+    roleName: 'Sound & Audio Engineer',
+    team: 'Media & Tech',
+    memberId: 'mem-4',
+    memberName: 'Hannah Thomas',
+    confirmed: true,
+    createdByName: 'Media Director',
+  },
+
+  // Wednesday Word & Intercession (02 Sep 2026)
+  {
+    id: 'rost-wed-1',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-02',
+    serviceName: 'Wednesday Word & Intercessory Prayer (7:00 PM)',
+    roleName: 'Altar Intercessor & Prayer Lead',
+    team: 'Prayer & Intercession',
+    memberId: 'mem-5',
+    memberName: 'Grace Daniel',
+    confirmed: true,
+    createdByName: 'Pastor Admin',
+  },
+  {
+    id: 'rost-wed-2',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-02',
+    serviceName: 'Wednesday Word & Intercessory Prayer (7:00 PM)',
+    roleName: 'Keyboard & Praise Facilitator',
+    team: 'Worship & Music',
+    memberId: 'mem-1',
+    memberName: 'David Raj',
+    confirmed: false,
+    createdByName: 'Pastor Admin',
+  },
+
+  // Friday Night Youth & Bible Fellowship (04 Sep 2026)
+  {
+    id: 'rost-fri-1',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-04',
+    serviceName: 'Friday Night Youth & Bible Fellowship (7:30 PM)',
+    roleName: 'Youth Worship & Acoustic',
+    team: 'Youth & Young Adults',
+    memberId: 'mem-2',
+    memberName: 'Priya Sharma',
+    confirmed: true,
+    createdByName: 'Youth Pastor',
+  },
+  {
+    id: 'rost-fri-2',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-04',
+    serviceName: 'Friday Night Youth & Bible Fellowship (7:30 PM)',
+    roleName: 'Refreshments & Hospitality Coordinator',
+    team: 'Ushering & Hospitality',
+    memberId: 'mem-6',
+    memberName: 'Joshua Paul',
+    confirmed: false,
+    createdByName: 'Youth Pastor',
+  },
+
+  // Saturday Morning Dawn Prayer (05 Sep 2026)
+  {
+    id: 'rost-sat-1',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-05',
+    serviceName: 'Saturday Morning Dawn Prayer (6:00 AM)',
+    roleName: 'Sanctuary Door Keeper & Usher',
+    team: 'Ushering & Hospitality',
+    memberId: 'mem-3',
+    memberName: 'Samuel Kumar',
+    confirmed: true,
+    createdByName: 'Prayer Director',
+  },
+  {
+    id: 'rost-sat-2',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-05',
+    serviceName: 'Saturday Morning Dawn Prayer (6:00 AM)',
+    roleName: 'Dawn Prayer Intercessor',
+    team: 'Prayer & Intercession',
+    memberId: 'mem-5',
+    memberName: 'Grace Daniel',
+    confirmed: true,
+    createdByName: 'Prayer Director',
+  },
+
+  // Sunday Resurrection Service (06 Sep 2026)
+  {
+    id: 'rost-sun2-1',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-06',
+    serviceName: 'Sunday Morning Worship (9:00 AM)',
+    roleName: 'Worship Leader & Vocalist',
+    team: 'Worship & Music',
+    memberId: 'mem-1',
+    memberName: 'David Raj',
+    confirmed: false,
+    createdByName: 'Senior Pastor',
+  },
+  {
+    id: 'rost-sun2-2',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    serviceDate: '2026-09-06',
+    serviceName: 'Sunday Morning Worship (9:00 AM)',
+    roleName: 'Live Stream & Projection Specialist',
+    team: 'Media & Tech',
+    memberId: 'mem-4',
+    memberName: 'Hannah Thomas',
+    confirmed: true,
+    createdByName: 'Media Director',
+  }
+];
 
 export const INITIAL_ATTENDANCE: AttendanceRecord[] = [];
 
@@ -294,33 +460,73 @@ export const INITIAL_WHATSAPP_TEMPLATES: WhatsAppReminderTemplate[] = [
     id: 'wa-1',
     church_id: 'church-1',
     churchId: 'church-1',
-    title: 'Sunday Worship Service Reminder',
+    title: 'Sunday Worship Service Broadcast Reminder',
     category: 'Service Reminder',
-    templateText: 'Dear {MemberName}, peace be with you! Gentle reminder that Sunday Worship Service at {ChurchName} begins tomorrow at 9:00 AM IST. Join us as Pastor preaches on God\'s Grace. Location: {City}. Blessings!'
+    templateText: '🔔 *{ChurchName} - Sunday Worship Service Reminder*\n\nDear {MemberName},\n\nGrace and peace to you in Christ! Join us tomorrow for Sunday Worship & Praise as we gather in the Lord\'s presence.\n\n📍 *Service:* {ServiceName}\n⏰ *Time:* {ServiceTime}\n🏛️ *Location:* {Location}, {City}\n🎙️ *Speaker:* {Speaker}\n📖 *Theme:* {MemoryVerse}\n\n📺 *Watch Live Stream:* {LivestreamLink}\n\n_Let us come with expectant hearts! Bring your family and friends._\n\nBlessings,\n*{ChurchName} Pastoral Team*'
   },
   {
     id: 'wa-2',
     church_id: 'church-1',
     churchId: 'church-1',
-    title: 'Urgent Church Prayer Request Alert',
-    category: 'Prayer Alert',
-    templateText: 'Church Family Prayer Alert: Please lift up in prayer {PrayerTitle} for {MemberName}. {PrayerDescription}. Let us stand united in faith!'
+    title: 'Sunday School Attendance & Verse Summary (Broadcast)',
+    category: 'Sunday School',
+    templateText: '🌟 *{ChurchName} - Sunday School Weekly Summary*\n\nDear Parents & Families,\n\nPraise God for a blessed Sunday School session today with our children in *{ClassName}*!\n\n📊 *Session Overview ({Date}):*\n• Total Present: *{PresentCount} children*\n• Absent: *{AbsentCount} children*\n• Teacher / Leader: *{TeacherName}*\n\n📖 *Lesson of the Week:*\n*{LessonTopic}*\n\n📜 *Memory Verse to Practice at Home:*\n> "{MemoryVerse}"\n\n🎯 *Home Action:* Please take 5 minutes this week to help your child memorize and recite this verse. Children who recite next Sunday will receive a special badge!\n\n_“Train up a child in the way he should go, and when he is old he will not depart from it.” — Proverbs 22:6_\n\nWith love & prayers,\n*{ClassName} Sunday School Teachers*'
   },
   {
     id: 'wa-3',
     church_id: 'church-1',
     churchId: 'church-1',
-    title: 'Sunday School & Memory Verse Notice',
+    title: 'Sunday School Weekly Memory Verse Challenge',
     category: 'Sunday School',
-    templateText: 'Dear Parents, Sunday School for children starts at 10:00 AM IST tomorrow at {ChurchName}. This week\'s Memory Verse: {MemoryVerse}. Please bring your child\'s Bible and notebook!'
+    templateText: '📖 *Weekly Memory Verse Challenge | {ClassName}*\n\nDear Parents of {ChurchName},\n\nHere is this week\'s memory verse for our Sunday School students:\n\n✨ *"{MemoryVerse}"*\n\n📚 *Current Lesson:* {LessonTopic}\n🗓️ *Target Sunday:* {Date}\n\n🏆 *Challenge:* Practice this verse 3 times before bedtime each night. Let\'s hide God\'s Word in our children\'s hearts!\n\nGod bless you and your family,\n*{TeacherName}* • {ChurchName}'
   },
   {
     id: 'wa-4',
     church_id: 'church-1',
     churchId: 'church-1',
-    title: 'Warm Attendance Follow-Up',
+    title: 'Sunday School Individual Child Attendance Note',
+    category: 'Sunday School',
+    templateText: 'Dear {MemberName},\n\nGrace and peace! We are joyful that your child attended Sunday School today at *{ChurchName}* in *{ClassName}*.\n\n📖 *Today\'s Lesson:* {LessonTopic}\n📜 *Memory Verse:* "{MemoryVerse}"\n\nThank you for discipling your family in the Lord! Please practice the memory verse together at home this week.\n\nBlessings,\n*{TeacherName}*'
+  },
+  {
+    id: 'wa-5',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    title: 'Midweek Word & Intercessory Prayer Reminder',
+    category: 'Service Reminder',
+    templateText: '🙏 *{ChurchName} - Midweek Word & Prayer Gathering*\n\nDear {MemberName},\n\nJoin us this Wednesday at *{ServiceTime}* for an evening of deep Scripture reflection and united churchwide prayer.\n\n📍 *Sanctuary:* {Location}\n📖 *Message Topic:* {MemoryVerse}\n\n_“For where two or three gather in my name, there am I with them.” — Matthew 18:20_\n\nBring your prayer requests and come expectant!\n\n*{ChurchName}*'
+  },
+  {
+    id: 'wa-6',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    title: 'Youth & Young Adults Fellowship Alert',
+    category: 'Service Reminder',
+    templateText: '🔥 *YOUTH FELLOWSHIP ALERT | {ChurchName}*\n\nHey {MemberName}!\n\nGet ready for Youth Fellowship this Friday at *{ServiceTime}*! Anointed praise, dynamic discussion, games, and fellowship.\n\n📍 *Venue:* {Location}\n🎯 *Topic:* {LessonTopic}\n\nTag a friend and don\'t come alone! See you there!\n\n*{ChurchName} Youth Team*'
+  },
+  {
+    id: 'wa-7',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    title: 'Urgent Church Prayer Request Alert',
+    category: 'Prayer Alert',
+    templateText: '🚨 *URGENT PRAYER ALERT | {ChurchName}*\n\nChurch Family,\n\nPlease stand in fervent intercession for:\n\n🙏 *Request:* {PrayerTitle}\n📝 *Details:* {PrayerDescription}\n\n_“The prayer of a righteous person is powerful and effective.” — James 5:16_\n\nLet us believe God together for complete victory and healing!'
+  },
+  {
+    id: 'wa-8',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    title: 'Post-Service Pastoral Care & Absentee Check-in',
     category: 'Attendance Follow-up',
-    templateText: 'Dear {MemberName}, we missed you at {ChurchName} worship service today! We prayed for you and your family. If you need any prayer support or pastoral call, please reply to this message.'
+    templateText: 'Dear {MemberName},\n\nWarm greetings from {ChurchName}! We missed you and your family at worship service today. You were in our prayers during service.\n\nIf you or your family need prayer support, a pastoral home visit, or anything else, please reply to this message anytime.\n\nMay God bless your upcoming week with peace and favor!\n\nIn Christ,\n*{ChurchName} Pastoral Care Team*'
+  },
+  {
+    id: 'wa-9',
+    church_id: 'church-1',
+    churchId: 'church-1',
+    title: 'Tithe & Offering Contribution Receipt',
+    category: 'Tithe Receipt',
+    templateText: '🧾 *{ChurchName} - Contribution Receipt*\n\nDear {MemberName},\n\nThank you for your generous and faithful offering.\n\n💰 *Amount:* ₹{Amount}\n🏷️ *Fund:* {FundName}\n🔖 *Receipt No:* {ReceiptNo}\n📅 *Date:* {Date}\n\n_“God loves a cheerful giver.” — 2 Corinthians 9:7_\n\nMay the Lord bless and multiply your seed sown!\n\n*{ChurchName} Finance Team*'
   }
 ];
 
@@ -690,6 +896,7 @@ export const INITIAL_CHURCH_SETTINGS: Record<string, CompleteChurchSettings> = {
       moduleToggles: {
         dashboard: true,
         reports: true,
+        visitors: true,
         ministries: true,
         directory: true,
         prayers: true,
@@ -857,6 +1064,7 @@ export const INITIAL_CHURCH_SETTINGS: Record<string, CompleteChurchSettings> = {
       moduleToggles: {
         dashboard: true,
         reports: true,
+        visitors: true,
         ministries: true,
         directory: true,
         prayers: true,
@@ -1011,6 +1219,7 @@ export const INITIAL_CHURCH_SETTINGS: Record<string, CompleteChurchSettings> = {
       moduleToggles: {
         dashboard: true,
         reports: true,
+        visitors: true,
         ministries: true,
         directory: true,
         prayers: true,

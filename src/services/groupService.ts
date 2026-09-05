@@ -223,26 +223,29 @@ function saveLocalGroupEvents(churchId: string, list: MinistryEvent[]) {
 
 export const groupService = {
   async getGroups(churchId: string, userLeaderFilter?: string): Promise<Group[]> {
+    let cloudGroups: Group[] = [];
     if (isSupabaseConfigured()) {
-      let query = supabase
-        .from('groups')
-        .select(`
-          *,
-          leader:profiles!groups_leader_id_fkey(*),
-          assistant_leader:profiles!groups_co_leader_id_fkey(*),
-          ministry:ministries(*)
-        `)
-        .eq('church_id', churchId)
-        .order('name', { ascending: true });
+      try {
+        let query = supabase
+          .from('groups')
+          .select(`
+            *,
+            leader:profiles!groups_leader_id_fkey(*),
+            assistant_leader:profiles!groups_co_leader_id_fkey(*),
+            ministry:ministries(*)
+          `)
+          .eq('church_id', churchId)
+          .order('name', { ascending: true });
 
-      if (userLeaderFilter) {
-        query = query.or(`leader_id.eq.${userLeaderFilter},co_leader_id.eq.${userLeaderFilter}`);
-      }
+        if (userLeaderFilter) {
+          query = query.or(`leader_id.eq.${userLeaderFilter},co_leader_id.eq.${userLeaderFilter}`);
+        }
 
-      const { data, error } = await query;
-      if (!error && data) {
-        return data as Group[];
-      }
+        const { data, error } = await query;
+        if (!error && data) {
+          cloudGroups = data as Group[];
+        }
+      } catch (e) {}
     }
 
     let local = getLocalGroups(churchId);
@@ -250,9 +253,16 @@ export const groupService = {
       local = local.filter((g) => g.leader_id === userLeaderFilter || g.co_leader_id === userLeaderFilter);
     }
 
+    const map = new Map<string, Group>();
+    cloudGroups.forEach((g) => map.set(g.id, g));
+    local.forEach((g) => {
+      if (!map.has(g.id)) map.set(g.id, g);
+    });
+
+    const combined = Array.from(map.values());
     const members = getLocalGroupMembers(churchId);
 
-    return local.map((g) => {
+    return combined.map((g) => {
       const gMembers = members.filter((gm) => gm.group_id === g.id);
       return {
         ...g,
@@ -354,12 +364,20 @@ export const groupService = {
     };
 
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('groups')
-        .insert([newGroup])
-        .select('*')
-        .single();
-      if (!error && data) return data as Group;
+      try {
+        const { data, error } = await supabase
+          .from('groups')
+          .insert([newGroup])
+          .select('*')
+          .single();
+        if (!error && data) {
+          const local = getLocalGroups(churchId);
+          saveLocalGroups(churchId, [data as Group, ...local.filter(g => g.id !== data.id)]);
+          return data as Group;
+        }
+      } catch (e) {
+        console.warn('Supabase group insert warning, using local storage:', e);
+      }
     }
 
     const local = getLocalGroups(churchId);

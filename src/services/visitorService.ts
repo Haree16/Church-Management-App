@@ -1,11 +1,11 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { Visitor, VisitorStatus } from '@/types/database';
-import { DEMO_VISITORS, DEMO_USERS } from '@/lib/mockData';
+import { Visitor, VisitorStatus, VisitorVisit, ChurchMember } from '@/types/database';
+import { DEMO_USERS } from '@/lib/mockData';
 import { memberService, CreateMemberPayload } from './memberService';
 import { followUpService } from './followUpService';
 
 const LOCAL_STORAGE_VISITORS_KEY = 'church_cms_visitors_data';
-const LOCAL_STORAGE_FOLLOWUPS_KEY = 'church_cms_followups_data';
+const LOCAL_STORAGE_VISITOR_VISITS_KEY = 'church_cms_visitor_visits_data';
 
 export interface CreateVisitorPayload {
   first_name: string;
@@ -17,6 +17,9 @@ export interface CreateVisitorPayload {
   state?: string;
   postal_code?: string;
   visit_date: string;
+  first_visit_date?: string;
+  last_visit_date?: string;
+  visit_count?: number;
   service_attended?: string;
   invited_by?: string;
   heard_about?: string;
@@ -48,24 +51,57 @@ function saveLocalVisitors(churchId: string, visitors: Visitor[]) {
   }
 }
 
+function getLocalVisitorVisits(churchId: string, visitorId?: string): VisitorVisit[] {
+  try {
+    const raw = localStorage.getItem(`${LOCAL_STORAGE_VISITOR_VISITS_KEY}_${churchId}`);
+    if (raw) {
+      const parsed: VisitorVisit[] = JSON.parse(raw);
+      if (visitorId) return parsed.filter((v) => v.visitor_id === visitorId);
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to read local visitor visits:', e);
+  }
+  return [];
+}
+
+function saveLocalVisitorVisit(churchId: string, visit: VisitorVisit) {
+  try {
+    const all = getLocalVisitorVisits(churchId);
+    localStorage.setItem(`${LOCAL_STORAGE_VISITOR_VISITS_KEY}_${churchId}`, JSON.stringify([visit, ...all]));
+  } catch (e) {
+    console.error('Failed to save local visitor visit:', e);
+  }
+}
+
 export const visitorService = {
   async getVisitors(churchId: string): Promise<Visitor[]> {
+    let cloudVisitors: Visitor[] = [];
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('visitors')
-        .select('*, assigned_leader:profiles(*)')
-        .eq('church_id', churchId)
-        .order('visit_date', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('visitors')
+          .select('*, assigned_leader:profiles(*)')
+          .eq('church_id', churchId)
+          .order('visit_date', { ascending: false });
 
-      if (!error && data) {
-        return data as Visitor[];
-      }
+        if (!error && data) {
+          cloudVisitors = data as Visitor[];
+        }
+      } catch (e) {}
     }
 
     const local = getLocalVisitors(churchId);
-    return local.map((v) => ({
+    const map = new Map<string, Visitor>();
+    cloudVisitors.forEach((v) => map.set(v.id, v));
+    local.forEach((v) => {
+      if (!map.has(v.id)) map.set(v.id, v);
+    });
+
+    const combined = Array.from(map.values());
+    return combined.map((v) => ({
       ...v,
-      assigned_leader: DEMO_USERS.find((u) => u.id === v.assigned_to)
+      assigned_leader: v.assigned_leader || (DEMO_USERS.find((u) => u.id === v.assigned_to)
         ? {
             id: v.assigned_to!,
             email: DEMO_USERS.find((u) => u.id === v.assigned_to)!.email,
@@ -78,17 +114,141 @@ export const visitorService = {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }
-        : null,
+        : null),
     }));
   },
 
   async getVisitorById(churchId: string, visitorId: string): Promise<Visitor | null> {
     const visitors = await this.getVisitors(churchId);
-    return visitors.find((v) => v.id === visitorId) || null;
+    const visitor = visitors.find((v) => v.id === visitorId) || null;
+    if (visitor) {
+      const visits = await this.getVisitorVisits(churchId, visitorId);
+      visitor.visits = visits;
+    }
+    return visitor;
+  },
+
+  async getVisitorVisits(churchId: string, visitorId: string): Promise<VisitorVisit[]> {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('visitor_visits')
+        .select('*')
+        .eq('church_id', churchId)
+        .eq('visitor_id', visitorId)
+        .order('visit_date', { ascending: false });
+
+      if (!error && data) {
+        return data as VisitorVisit[];
+      }
+    }
+    return getLocalVisitorVisits(churchId, visitorId);
+  },
+
+  async recordVisitorVisit(
+    churchId: string,
+    visitorId: string,
+    visitPayload: {
+      visit_date: string;
+      service_attended?: string;
+      notes?: string;
+      invited_by?: string;
+      source?: string;
+    }
+  ): Promise<VisitorVisit> {
+    const newVisit: VisitorVisit = {
+      id: `visit-${Date.now()}`,
+      church_id: churchId,
+      visitor_id: visitorId,
+      visit_date: visitPayload.visit_date || new Date().toISOString().split('T')[0],
+      service_attended: visitPayload.service_attended || null,
+      notes: visitPayload.notes || null,
+      invited_by: visitPayload.invited_by || null,
+      source: visitPayload.source || null,
+      created_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('visitor_visits')
+        .insert([newVisit])
+        .select('*')
+        .single();
+      if (!error && data) {
+        const visits = await this.getVisitorVisits(churchId, visitorId);
+        const count = visits.length;
+        const visitor = await this.getVisitorById(churchId, visitorId);
+        const newStatus = (visitor?.status === 'new' || visitor?.status === 'contact_pending' || visitor?.status === 'contacted') ? 'returned_visitor' : (visitor?.status || 'returned_visitor');
+        await supabase
+          .from('visitors')
+          .update({
+            last_visit_date: newVisit.visit_date,
+            visit_count: count,
+            status: newStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', visitorId);
+
+        return data as VisitorVisit;
+      }
+    }
+
+    saveLocalVisitorVisit(churchId, newVisit);
+    const visits = getLocalVisitorVisits(churchId, visitorId);
+    const local = getLocalVisitors(churchId);
+    const idx = local.findIndex((v) => v.id === visitorId);
+    if (idx >= 0) {
+      const v = local[idx];
+      const newStatus = (v.status === 'new' || v.status === 'contact_pending' || v.status === 'contacted') ? 'returned_visitor' : (v.status || 'returned_visitor');
+      local[idx] = {
+        ...v,
+        last_visit_date: newVisit.visit_date,
+        visit_count: visits.length,
+        status: newStatus as VisitorStatus,
+        updated_at: new Date().toISOString(),
+      };
+      saveLocalVisitors(churchId, local);
+    }
+
+    return newVisit;
+  },
+
+  async checkPossibleDuplicates(
+    churchId: string,
+    query: { phone?: string; email?: string; first_name?: string; last_name?: string }
+  ): Promise<{ visitors: Visitor[]; members: ChurchMember[] }> {
+    const visitors = await this.getVisitors(churchId);
+    const members = await memberService.getMembers(churchId);
+
+    const cleanPhone = query.phone ? query.phone.replace(/\D/g, '') : '';
+    const cleanEmail = query.email ? query.email.trim().toLowerCase() : '';
+    const cleanFirst = query.first_name ? query.first_name.trim().toLowerCase() : '';
+    const cleanLast = query.last_name ? query.last_name.trim().toLowerCase() : '';
+
+    const matchedVisitors = visitors.filter((v) => {
+      if (cleanPhone && cleanPhone.length > 5 && v.phone && v.phone.replace(/\D/g, '').includes(cleanPhone)) return true;
+      if (cleanEmail && v.email && v.email.toLowerCase() === cleanEmail) return true;
+      if (cleanFirst && cleanLast && v.first_name.toLowerCase() === cleanFirst && v.last_name.toLowerCase() === cleanLast) return true;
+      return false;
+    });
+
+    const matchedMembers = members.filter((m) => {
+      const phone = m.profile?.phone || '';
+      const email = m.profile?.email || '';
+      const first = m.profile?.first_name || '';
+      const last = m.profile?.last_name || '';
+
+      if (cleanPhone && cleanPhone.length > 5 && phone && phone.replace(/\D/g, '').includes(cleanPhone)) return true;
+      if (cleanEmail && email && email.toLowerCase() === cleanEmail) return true;
+      if (cleanFirst && cleanLast && first.toLowerCase() === cleanFirst && last.toLowerCase() === cleanLast) return true;
+      return false;
+    });
+
+    return { visitors: matchedVisitors, members: matchedMembers };
   },
 
   async createVisitor(churchId: string, payload: CreateVisitorPayload): Promise<Visitor> {
     const visitorId = `v-${Date.now()}`;
+    const visitDate = payload.visit_date || new Date().toISOString().split('T')[0];
     const newVisitor: Visitor = {
       id: visitorId,
       church_id: churchId,
@@ -100,7 +260,10 @@ export const visitorService = {
       city: payload.city || null,
       state: payload.state || null,
       postal_code: payload.postal_code || null,
-      visit_date: payload.visit_date || new Date().toISOString().split('T')[0],
+      visit_date: visitDate,
+      first_visit_date: payload.first_visit_date || visitDate,
+      last_visit_date: payload.last_visit_date || visitDate,
+      visit_count: payload.visit_count || 1,
       service_attended: payload.service_attended || 'Sunday Contemporary Service',
       invited_by: payload.invited_by || null,
       heard_about: payload.heard_about || 'Friend / Family',
@@ -116,26 +279,44 @@ export const visitorService = {
     };
 
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('visitors')
-        .insert([newVisitor])
-        .select('*')
-        .single();
-      if (!error && data) {
-        // If follow up is required, create follow up task in database
-        if (payload.create_follow_up || payload.status === 'follow_up_required') {
-          await supabase.from('follow_ups').insert([{
+      try {
+        const { data, error } = await supabase
+          .from('visitors')
+          .insert([newVisitor])
+          .select('*')
+          .single();
+        if (!error && data) {
+          // Record initial visit in visitor_visits
+          await supabase.from('visitor_visits').insert([{
+            id: `visit-${Date.now()}`,
             church_id: churchId,
             visitor_id: data.id,
-            assigned_to: payload.assigned_to || null,
-            title: payload.follow_up_title || `Follow up with ${payload.first_name} ${payload.last_name}`,
-            notes: payload.notes || payload.prayer_request || 'First-time visitor welcome check-in',
-            due_date: payload.follow_up_due_date || new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString().split('T')[0],
-            priority: 'high',
-            status: 'pending',
+            visit_date: visitDate,
+            service_attended: payload.service_attended || 'Sunday Contemporary Service',
+            invited_by: payload.invited_by || null,
+            notes: payload.notes || 'First visit recorded',
+            created_at: new Date().toISOString(),
           }]);
+
+          // If follow up is required, create follow up task in database
+          if (payload.create_follow_up || payload.status === 'follow_up_required') {
+            await supabase.from('follow_ups').insert([{
+              church_id: churchId,
+              visitor_id: data.id,
+              assigned_to: payload.assigned_to || null,
+              title: payload.follow_up_title || `Follow up with ${payload.first_name} ${payload.last_name}`,
+              notes: payload.notes || payload.prayer_request || 'First-time visitor welcome check-in',
+              due_date: payload.follow_up_due_date || new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString().split('T')[0],
+              priority: 'high',
+              status: 'pending',
+            }]);
+          }
+          const local = getLocalVisitors(churchId);
+          saveLocalVisitors(churchId, [data as Visitor, ...local.filter(v => v.id !== data.id)]);
+          return data as Visitor;
         }
-        return data as Visitor;
+      } catch (e) {
+        console.warn('Supabase visitor insert warning, falling back to local storage:', e);
       }
     }
 
@@ -143,6 +324,18 @@ export const visitorService = {
     const local = getLocalVisitors(churchId);
     const updated = [newVisitor, ...local];
     saveLocalVisitors(churchId, updated);
+
+    // Initial visit locally
+    saveLocalVisitorVisit(churchId, {
+      id: `visit-${Date.now()}`,
+      church_id: churchId,
+      visitor_id: newVisitor.id,
+      visit_date: visitDate,
+      service_attended: payload.service_attended || 'Sunday Contemporary Service',
+      invited_by: payload.invited_by || null,
+      notes: payload.notes || 'First visit recorded',
+      created_at: new Date().toISOString(),
+    });
 
     // If follow-up is required or requested, automatically create follow-up task
     if (payload.create_follow_up || payload.status === 'follow_up_required') {
@@ -186,6 +379,9 @@ export const visitorService = {
           state: payload.state,
           postal_code: payload.postal_code,
           visit_date: payload.visit_date,
+          first_visit_date: payload.first_visit_date,
+          last_visit_date: payload.last_visit_date,
+          visit_count: payload.visit_count,
           service_attended: payload.service_attended,
           invited_by: payload.invited_by,
           heard_about: payload.heard_about,
@@ -236,7 +432,7 @@ export const visitorService = {
       role: memberData.role || 'member',
       status: 'active',
       joined_date: new Date().toISOString().split('T')[0],
-      notes: `Converted from guest visitor (First visited on ${visitor.visit_date}). ${visitor.notes || ''}`.trim(),
+      notes: `Converted from guest visitor (First visited on ${visitor.visit_date || visitor.first_visit_date}). ${visitor.notes || ''}`.trim(),
     });
 
     // 2. Update visitor status to 'became_member' and link member_id, preserving history!
@@ -277,3 +473,4 @@ export const visitorService = {
     saveLocalVisitors(churchId, updated);
   },
 };
+

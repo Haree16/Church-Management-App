@@ -586,11 +586,13 @@ export const ChurchSettingsModule: React.FC<ChurchSettingsModuleProps> = ({
 
                     <div className="flex-1 min-w-0 text-center sm:text-left">
                       <h4 className="text-base font-black text-slate-900 truncate">
-                        {formData.profile.name || 'New Creation Assembly Church'}
+                        {formData.profile.name || 'Church Profile'}
                       </h4>
-                      <p className="text-xs text-amber-600 font-semibold truncate">
-                        {formData.profile.tagline || 'Loving God, Loving People, Serving Chennai'}
-                      </p>
+                      {formData.profile.tagline && (
+                        <p className="text-xs text-amber-600 font-semibold truncate">
+                          {formData.profile.tagline}
+                        </p>
+                      )}
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-[11px] text-slate-500 mt-2">
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -727,7 +729,7 @@ export const ChurchSettingsModule: React.FC<ChurchSettingsModuleProps> = ({
                         }))
                       }
                       disabled={!canEdit}
-                      placeholder="e.g. Loving God, Loving People, Serving Chennai"
+                      placeholder="e.g. Building Families, Impacting Nations"
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>

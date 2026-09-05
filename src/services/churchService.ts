@@ -46,11 +46,13 @@ export function getStoredChurches(): Church[] {
   return [DEMO_CHURCH, DEMO_CHURCH_2];
 }
 
+import { saveStoredChurches as saveStorageChurches } from '@/utils/storage';
+
 export function saveStoredChurches(churches: Church[]): void {
   try {
-    localStorage.setItem(LOCAL_STORAGE_CHURCHES_KEY, JSON.stringify(churches));
+    saveStorageChurches(churches as any);
   } catch (e) {
-    console.error('Failed to store churches:', e);
+    console.warn('Failed to store churches:', e);
   }
 }
 

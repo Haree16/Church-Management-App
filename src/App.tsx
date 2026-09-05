@@ -71,6 +71,7 @@ import {
   saveAnnouncementToFirestore,
   deleteAnnouncementFromFirestore,
   saveNotificationToFirestore,
+  deleteNotificationFromFirestore,
   clearAllNotificationsFromFirestore,
   subscribeSundaySchoolClasses,
   saveSundaySchoolClassToFirestore,
@@ -112,6 +113,12 @@ import { isTabAllowed, getDefaultTabForRole, getRoleConfig } from './utils/rbac'
 
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
+import { 
+  isNotificationForUser, 
+  isNotificationReadByUser, 
+  findLinkedMemberForUser, 
+  findLinkedUserForMember 
+} from './utils/notificationUtils';
 import { BottomNav, AppTab } from './components/BottomNav';
 import { MemberList } from './components/MemberList';
 import { MemberDetailModal } from './components/MemberDetailModal';
@@ -133,6 +140,9 @@ import { ChurchSettingsModule } from './components/settings/ChurchSettingsModule
 import { MinistriesModule } from './components/ministries/MinistriesModule';
 import { ChurchDashboard } from './components/dashboard/ChurchDashboard';
 import { ReportsModule, ReportCategory } from './components/reports/ReportsModule';
+import { VisitorsPage } from './pages/people/VisitorsPage';
+import { PastoralCareModule } from './components/care/PastoralCareModule';
+import { SmallGroupsModule } from './components/groups/SmallGroupsModule';
 import { initMobileNotifications, sendMobilePanelNotification } from './services/mobileNotificationService';
 
 export default function App() {
@@ -680,6 +690,7 @@ export default function App() {
   };
 
   const handleSaveMinistryMember = async (mm: MinistryMember) => {
+    const isNew = !rawMinistryMembers.some(m => m.id === mm.id || (m.memberId === mm.memberId && m.ministryId === mm.ministryId));
     const stamped: MinistryMember = {
       ...mm,
       church_id: activeChurchId,
@@ -695,9 +706,9 @@ export default function App() {
 
     // Keep member.ministryTeams synced for seamless backward compatibility
     const targetMin = rawMinistries.find(m => m.id === stamped.ministryId);
-    if (targetMin) {
-      const targetMember = rawMembers.find(m => m.id === stamped.memberId);
-      if (targetMember && !targetMember.ministryTeams?.includes(targetMin.name as any)) {
+    const targetMember = rawMembers.find(m => m.id === stamped.memberId);
+    if (targetMin && targetMember) {
+      if (!targetMember.ministryTeams?.includes(targetMin.name as any)) {
         const updatedMember: Member = {
           ...targetMember,
           ministryTeams: [...(targetMember.ministryTeams || []), targetMin.name as any]
@@ -707,6 +718,41 @@ export default function App() {
         saveStoredMembers(nextMembers);
         saveMemberToFirestore(updatedMember).catch(console.warn);
       }
+    }
+
+    // DISPATCH TARGETED MINISTRY ALERT: Shown ONLY to the added member until seen
+    if (isNew) {
+      const minName = targetMin?.name || 'Ministry';
+      const targetUser = findLinkedUserForMember(stamped.memberId, allUsers, rawMembers);
+
+      const addMemberAlert: AppNotification = {
+        id: `notif-min-member-${Date.now()}-${stamped.memberId}`,
+        church_id: activeChurchId,
+        churchId: activeChurchId,
+        title: `🤝 Welcome to ${minName}!`,
+        message: `You have been added to the "${minName}" team as "${stamped.ministryRole || stamped.role || 'Team Member'}". Welcome to the ministry team!`,
+        category: 'Ministry',
+        date: new Date().toISOString().split('T')[0],
+        read: false,
+        readByUserIds: [],
+        targetUserIds: targetUser ? [targetUser.id] : [],
+        targetMemberIds: [stamped.memberId],
+        linkTab: 'ministries',
+        createdByUserId: currentUser?.id,
+        authorName: currentUser?.name || 'Ministry Leader',
+        metadata: {
+          ministryId: stamped.ministryId,
+          ministryName: minName,
+          memberId: stamped.memberId,
+          memberName: targetMember ? `${targetMember.firstName} ${targetMember.lastName}` : undefined,
+          actionType: 'member_added',
+        }
+      };
+
+      const nextNotifs = [addMemberAlert, ...rawNotifications];
+      setRawNotifications(nextNotifs);
+      saveStoredNotifications(nextNotifs);
+      saveNotificationToFirestore(addMemberAlert).catch(console.warn);
     }
   };
 
@@ -740,6 +786,7 @@ export default function App() {
   };
 
   const handleSaveMinistryTeamMember = async (mtm: MinistryTeamMember) => {
+    const isNew = !rawMinistryTeamMembers.some(t => t.id === mtm.id || (t.memberId === mtm.memberId && t.teamId === mtm.teamId));
     const stamped: MinistryTeamMember = {
       ...mtm,
       church_id: activeChurchId,
@@ -751,6 +798,47 @@ export default function App() {
     setRawMinistryTeamMembers(next);
     saveStoredMinistryTeamMembers(next);
     await saveMinistryTeamMemberToFirestore(stamped).catch(console.warn);
+
+    // DISPATCH TARGETED TEAM ALERT: Shown ONLY to the added member until seen
+    if (isNew) {
+      const targetTeam = rawMinistryTeams.find(t => t.id === stamped.teamId);
+      const targetMin = rawMinistries.find(m => m.id === stamped.ministryId);
+      const targetMember = rawMembers.find(m => m.id === stamped.memberId);
+      const teamName = targetTeam?.name || 'Ministry Team';
+      const minName = targetMin?.name || 'Ministry';
+      const targetUser = findLinkedUserForMember(stamped.memberId, allUsers, rawMembers);
+
+      const addTeamMemberAlert: AppNotification = {
+        id: `notif-team-member-${Date.now()}-${stamped.memberId}`,
+        church_id: activeChurchId,
+        churchId: activeChurchId,
+        title: `👥 Added to ${teamName} (${minName})`,
+        message: `You have been added to the "${teamName}" team in ${minName} as "${stamped.role || 'Team Member'}".`,
+        category: 'Ministry',
+        date: new Date().toISOString().split('T')[0],
+        read: false,
+        readByUserIds: [],
+        targetUserIds: targetUser ? [targetUser.id] : [],
+        targetMemberIds: [stamped.memberId],
+        linkTab: 'ministries',
+        createdByUserId: currentUser?.id,
+        authorName: currentUser?.name || 'Ministry Leader',
+        metadata: {
+          ministryId: stamped.ministryId,
+          ministryName: minName,
+          teamId: stamped.teamId,
+          teamName,
+          memberId: stamped.memberId,
+          memberName: targetMember ? `${targetMember.firstName} ${targetMember.lastName}` : undefined,
+          actionType: 'member_added',
+        }
+      };
+
+      const nextNotifs = [addTeamMemberAlert, ...rawNotifications];
+      setRawNotifications(nextNotifs);
+      saveStoredNotifications(nextNotifs);
+      saveNotificationToFirestore(addTeamMemberAlert).catch(console.warn);
+    }
   };
 
   const handleDeleteMinistryTeamMember = async (id: string) => {
@@ -761,17 +849,76 @@ export default function App() {
   };
 
   const handleSaveMinistryActivity = async (act: MinistryActivity) => {
+    const isNew = !rawMinistryActivities.some(a => a.id === act.id);
+    const creatorUserId = act.createdByUserId || currentUser?.id;
     const stamped: MinistryActivity = {
       ...act,
       church_id: activeChurchId,
       churchId: activeChurchId,
+      createdByUserId: creatorUserId,
     };
-    const next = rawMinistryActivities.some(a => a.id === stamped.id)
-      ? rawMinistryActivities.map(a => a.id === stamped.id ? stamped : a)
-      : [...rawMinistryActivities, stamped];
+    const next = isNew
+      ? [...rawMinistryActivities, stamped]
+      : rawMinistryActivities.map(a => a.id === stamped.id ? stamped : a);
     setRawMinistryActivities(next);
     saveStoredMinistryActivities(next);
     await saveMinistryActivityToFirestore(stamped).catch(console.warn);
+
+    // DISPATCH ACTIVITY ALERT: Notify all team/ministry members EXCEPT the activity creator user
+    if (isNew && stamped.status !== 'Cancelled') {
+      const targetMin = rawMinistries.find(m => m.id === stamped.ministryId);
+      const targetTeam = rawMinistryTeams.find(t => t.id === stamped.teamId);
+      const minName = targetMin?.name || 'Ministry';
+      const teamName = targetTeam?.name;
+
+      // Collect member IDs in this ministry and team
+      const minMemberIds = rawMinistryMembers.filter(mm => mm.ministryId === stamped.ministryId).map(mm => mm.memberId);
+      const teamMemberIds = stamped.teamId
+        ? rawMinistryTeamMembers.filter(tm => tm.teamId === stamped.teamId).map(tm => tm.memberId)
+        : [];
+      const targetMemberIds = Array.from(new Set([...minMemberIds, ...teamMemberIds]));
+
+      // Collect user IDs for these members
+      const targetUserIds = targetMemberIds
+        .map(mid => findLinkedUserForMember(mid, allUsers, rawMembers)?.id)
+        .filter((uid): uid is string => Boolean(uid));
+
+      // Exclude creator
+      const currentMember = findLinkedMemberForUser(currentUser, rawMembers);
+
+      const activityAlert: AppNotification = {
+        id: `notif-min-act-${Date.now()}-${stamped.id}`,
+        church_id: activeChurchId,
+        churchId: activeChurchId,
+        title: `📅 ${teamName ? `${teamName} (${minName})` : minName}: ${stamped.name} Scheduled`,
+        message: `New activity "${stamped.name}" scheduled for ${stamped.date} at ${stamped.startTime} (${stamped.location || 'Church'}). Leader: ${stamped.leaderName || 'Ministry Leader'}.`,
+        category: 'Activity',
+        date: stamped.date || new Date().toISOString().split('T')[0],
+        read: false,
+        readByUserIds: [],
+        targetUserIds: targetUserIds.length > 0 ? targetUserIds : undefined,
+        targetMemberIds: targetMemberIds.length > 0 ? targetMemberIds : undefined,
+        excludeUserIds: creatorUserId ? [creatorUserId] : [],
+        excludeMemberIds: currentMember ? [currentMember.id] : [],
+        linkTab: 'ministries',
+        createdByUserId: creatorUserId,
+        authorName: currentUser?.name || stamped.leaderName || 'Ministry Leader',
+        metadata: {
+          ministryId: stamped.ministryId,
+          ministryName: minName,
+          teamId: stamped.teamId,
+          teamName,
+          activityId: stamped.id,
+          activityName: stamped.name,
+          actionType: 'activity_scheduled',
+        }
+      };
+
+      const nextNotifs = [activityAlert, ...rawNotifications];
+      setRawNotifications(nextNotifs);
+      saveStoredNotifications(nextNotifs);
+      saveNotificationToFirestore(activityAlert).catch(console.warn);
+    }
   };
 
   const handleDeleteMinistryActivity = async (id: string) => {
@@ -1157,25 +1304,111 @@ export default function App() {
   };
 
   const handleAddRosterAssignment = (assignment: RosterAssignment) => {
+    const isNew = !rawRoster.some(r => r.id === assignment.id);
+    const creatorUserId = assignment.createdByUserId || currentUser?.id;
     const stamped: RosterAssignment = {
       ...assignment,
       church_id: activeChurchId,
-      churchId: activeChurchId
+      churchId: activeChurchId,
+      createdByUserId: creatorUserId,
+      createdByName: assignment.createdByName || currentUser?.name || 'Roster Planner',
     };
-    const next = [stamped, ...rawRoster];
+    const next = isNew
+      ? [stamped, ...rawRoster]
+      : rawRoster.map(r => r.id === stamped.id ? stamped : r);
     setRawRoster(next);
     saveStoredRoster(next);
     saveRosterToFirestore(stamped);
+
+    // DISPATCH ROSTER ALERT: Notify the assigned volunteer member/user
+    if (isNew) {
+      const targetUser = findLinkedUserForMember(stamped.memberId, allUsers, rawMembers);
+
+      const rosterAlert: AppNotification = {
+        id: `notif-roster-assign-${Date.now()}-${stamped.id}`,
+        church_id: activeChurchId,
+        churchId: activeChurchId,
+        title: `📋 Roster Assignment: ${stamped.serviceName || 'Sunday Service'}`,
+        message: `Hi ${stamped.memberName}, you have been scheduled as "${stamped.roleName}" (${stamped.team}) on ${stamped.serviceDate}. Please review and confirm your availability in Roster Planner.`,
+        category: 'Roster',
+        date: new Date().toISOString().split('T')[0],
+        read: false,
+        readByUserIds: [],
+        targetUserIds: targetUser ? [targetUser.id] : [],
+        targetMemberIds: [stamped.memberId],
+        linkTab: 'roster',
+        createdByUserId: creatorUserId,
+        authorName: currentUser?.name || 'Roster Planner',
+        metadata: {
+          rosterId: stamped.id,
+          memberId: stamped.memberId,
+          memberName: stamped.memberName,
+          actionType: 'roster_created',
+        }
+      };
+
+      const nextNotifs = [rosterAlert, ...rawNotifications];
+      setRawNotifications(nextNotifs);
+      saveStoredNotifications(nextNotifs);
+      saveNotificationToFirestore(rosterAlert).catch(console.warn);
+    }
   };
 
   const handleToggleRosterConfirm = (id: string) => {
     const target = rawRoster.find(r => r.id === id);
     if (!target) return;
-    const updated = { ...target, confirmed: !target.confirmed };
+    const willBeConfirmed = !target.confirmed;
+    const updated = { ...target, confirmed: willBeConfirmed };
     const next = rawRoster.map((r) => r.id === id ? updated : r);
     setRawRoster(next);
     saveStoredRoster(next);
     saveRosterToFirestore(updated);
+
+    // DISPATCH CONFIRMATION ALERT: Notify ONLY the user who created the roster
+    if (willBeConfirmed) {
+      let creatorUserId = target.createdByUserId;
+
+      if (!creatorUserId && target.createdByName) {
+        const creatorUser = allUsers.find((u) => 
+          (u.church_id === activeChurchId || u.churchId === activeChurchId || activeChurchId === 'church-1') &&
+          u.name?.trim().toLowerCase() === target.createdByName?.trim().toLowerCase()
+        );
+        if (creatorUser) {
+          creatorUserId = creatorUser.id;
+        }
+      }
+
+      // Deliver exclusively to the creator user (if found and not the confirming user)
+      if (creatorUserId && creatorUserId !== currentUser?.id) {
+        const confirmAlert: AppNotification = {
+          id: `notif-roster-confirm-${Date.now()}-${target.id}`,
+          church_id: activeChurchId,
+          churchId: activeChurchId,
+          title: `✅ Roster Confirmed: ${target.memberName}`,
+          message: `${target.memberName} confirmed availability for "${target.roleName}" (${target.team}) on ${target.serviceDate} (${target.serviceName}).`,
+          category: 'Roster',
+          date: new Date().toISOString().split('T')[0],
+          read: false,
+          readByUserIds: [],
+          targetUserIds: [creatorUserId], // STRICTLY only the user who created this roster
+          excludeUserIds: currentUser?.id ? [currentUser.id] : [],
+          linkTab: 'roster',
+          createdByUserId: currentUser?.id,
+          authorName: currentUser?.name || target.memberName,
+          metadata: {
+            rosterId: target.id,
+            memberId: target.memberId,
+            memberName: target.memberName,
+            actionType: 'roster_confirmed',
+          }
+        };
+
+        const nextNotifs = [confirmAlert, ...rawNotifications];
+        setRawNotifications(nextNotifs);
+        saveStoredNotifications(nextNotifs);
+        saveNotificationToFirestore(confirmAlert).catch(console.warn);
+      }
+    }
   };
 
   const handleRemoveRosterAssignment = (id: string) => {
@@ -1288,7 +1521,7 @@ export default function App() {
     saveNotificationToFirestore(updated).catch(console.warn);
   };
 
-  const handleClearAllNotifs = () => {
+  const handleMarkAllNotifsRead = () => {
     const currentUserId = currentUser?.id;
     if (!currentUserId) return;
     const next = rawNotifications.map((n) => {
@@ -1312,6 +1545,34 @@ export default function App() {
     });
     setRawNotifications(next);
     saveStoredNotifications(next);
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    const next = rawNotifications.filter((n) => n.id !== id);
+    setRawNotifications(next);
+    saveStoredNotifications(next);
+    deleteNotificationFromFirestore(id).catch(console.warn);
+  };
+
+  const handleClearAllNotifs = async () => {
+    if (!window.confirm('Are you sure you want to clear all alerts for this church? This will delete them from the notification center.')) {
+      return;
+    }
+    const notifsToClear = rawNotifications.filter(
+      (n) =>
+        n.church_id === activeChurchId ||
+        n.churchId === activeChurchId ||
+        (!n.church_id && !n.churchId && activeChurchId === 'church-1')
+    );
+    const remaining = rawNotifications.filter(
+      (n) =>
+        n.church_id !== activeChurchId &&
+        n.churchId !== activeChurchId &&
+        (Boolean(n.church_id) || Boolean(n.churchId) || activeChurchId !== 'church-1')
+    );
+    setRawNotifications(remaining);
+    saveStoredNotifications(remaining);
+    await clearAllNotificationsFromFirestore(notifsToClear).catch(console.warn);
   };
 
   const handleSendNotification = (notif: AppNotification) => {
@@ -1697,6 +1958,7 @@ export default function App() {
           memberCount={members.length}
           prayerCount={prayers.length}
           volunteerCount={activeVolunteersCount}
+          members={members}
           isMobileFrame={isMobileFrame}
           onToggleFrame={() => setIsMobileFrame(!isMobileFrame)}
           onOpenAddMember={() => {
@@ -1716,6 +1978,8 @@ export default function App() {
           moduleToggles={activeModuleToggles}
           notifications={notifications}
           onMarkNotifRead={handleMarkNotifRead}
+          onMarkAllNotifsRead={handleMarkAllNotifsRead}
+          onDeleteNotif={handleDeleteNotification}
           onClearAllNotifs={handleClearAllNotifs}
           onSelectChurch={handleSelectChurch}
           onLogout={handleLogout}
@@ -1837,6 +2101,10 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'visitors' && (
+            <VisitorsPage currentChurch={currentChurch} currentUser={currentUser} />
+          )}
+
           {activeTab === 'ministries' && isTabAllowed(userRole, 'ministries', activeModuleToggles) && (
             <MinistriesModule
               currentChurch={currentChurch}
@@ -1871,12 +2139,17 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'groups' && isTabAllowed(userRole, 'groups', activeModuleToggles) && (
+            <SmallGroupsModule members={members} />
+          )}
+
           {activeTab === 'attendance' && isTabAllowed(userRole, 'attendance', activeModuleToggles) && (
             <AttendanceTracker
               members={members}
               attendanceRecords={attendance}
               currentUser={currentUser}
               churchSettings={activeChurchSettings}
+              groups={whatsappGroups}
               onSaveRecord={handleSaveAttendance}
               onDeleteRecord={roleConfig.canRecordAttendance ? handleDeleteAttendance : undefined}
             />
@@ -1906,6 +2179,10 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'pastoral' && isTabAllowed(userRole, 'pastoral', activeModuleToggles) && (
+            <PastoralCareModule />
+          )}
+
           {activeTab === 'calendar' && isTabAllowed(userRole, 'calendar', activeModuleToggles) && (
             <EventCalendar
               events={events}
@@ -1925,6 +2202,8 @@ export default function App() {
               currentUser={currentUser}
               allUsers={allUsers}
               onMarkRead={handleMarkNotifRead}
+              onMarkAllRead={handleMarkAllNotifsRead}
+              onDeleteNotification={handleDeleteNotification}
               onClearAll={handleClearAllNotifs}
               onSendNotification={handleSendNotification}
               onNavigateTab={(tab) => handleNavigateTab(tab as AppTab)}
@@ -1963,6 +2242,8 @@ export default function App() {
               members={members}
               ministries={ministries}
               currentUser={currentUser}
+              churchSettings={activeChurchSettings}
+              events={events}
               onAddAssignment={handleAddRosterAssignment}
               onToggleConfirm={handleToggleRosterConfirm}
               onRemoveAssignment={handleRemoveRosterAssignment}
@@ -1974,6 +2255,7 @@ export default function App() {
               classes={sundaySchoolClasses}
               students={sundaySchoolStudents}
               attendanceRecords={sundaySchoolAttendance}
+              groups={whatsappGroups}
               currentChurchId={activeChurchId}
               churchName={currentChurch?.name || 'New Creation Assembly Church'}
               currentUser={authSession?.user}
@@ -1997,6 +2279,12 @@ export default function App() {
               groups={whatsappGroups}
               currentChurch={currentChurch}
               canManageTemplates={roleConfig.canSendWhatsApp}
+              sundaySchoolClasses={sundaySchoolClasses}
+              sundaySchoolStudents={sundaySchoolStudents}
+              sundaySchoolAttendance={sundaySchoolAttendance}
+              churchSettings={activeChurchSettings}
+              events={events}
+              attendance={attendance}
               onSaveTemplate={handleSaveWhatsAppTemplate}
               onDeleteTemplate={roleConfig.canSendWhatsApp ? handleDeleteWhatsAppTemplate : undefined}
               onSaveGroup={handleSaveWhatsAppGroup}
@@ -2071,6 +2359,7 @@ export default function App() {
         <MemberFormModal
           isOpen={isAddMemberOpen}
           member={selectedMemberEdit}
+          existingMembers={rawMembers}
           currentChurchId={activeChurchId}
           ministries={ministries}
           onClose={() => {
@@ -2078,6 +2367,9 @@ export default function App() {
             setSelectedMemberEdit(null);
           }}
           onSave={handleAddOrUpdateMember}
+          onSelectExistingMember={(existing) => {
+            setSelectedMemberDetail(existing);
+          }}
         />
 
         <PrayerFormModal

@@ -3,7 +3,7 @@ import {
   Users, Heart, Calendar, Bell, 
   Megaphone, HeartHandshake, UserCheck, Menu, X,
   GraduationCap, MessageSquare, Building2, Settings, Landmark,
-  LayoutDashboard, BarChart3
+  LayoutDashboard, BarChart3, UserPlus
 } from 'lucide-react';
 import { SaaSUserRole, ChurchModuleToggles } from '../types';
 import { isTabAllowed, getRoleConfig, isModuleEnabledInChurch } from '../utils/rbac';
@@ -11,10 +11,13 @@ import { isTabAllowed, getRoleConfig, isModuleEnabledInChurch } from '../utils/r
 export type AppTab = 
   | 'dashboard'
   | 'reports'
+  | 'visitors'
   | 'directory' 
   | 'ministries'
+  | 'groups'
   | 'attendance' 
   | 'prayers' 
+  | 'pastoral'
   | 'calendar' 
   | 'notifications' 
   | 'announcements' 
@@ -48,9 +51,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const ALL_MODULES = [
     { id: 'dashboard' as AppTab, label: 'Dashboard', icon: LayoutDashboard, desc: 'Church analytics & personalized overview' },
     { id: 'reports' as AppTab, label: 'Reports', icon: BarChart3, desc: 'Detailed reports, growth trends & exports' },
+    { id: 'visitors' as AppTab, label: 'Visitors', icon: UserPlus, desc: 'Visitor lifecycle, follow-ups & conversion' },
     { id: 'directory' as AppTab, label: 'Members', icon: Users, desc: 'Church member & family directory' },
     { id: 'ministries' as AppTab, label: 'Ministries', icon: Landmark, desc: 'Church ministries, teams & activities' },
+    { id: 'groups' as AppTab, label: 'Small Groups', icon: Users, desc: 'Small groups, cell groups, meetings & attendance' },
     { id: 'prayers' as AppTab, label: 'Prayers', icon: Heart, desc: 'Intercessory prayer requests & praises', badge: urgentPrayerCount > 0 ? urgentPrayerCount : undefined },
+    { id: 'pastoral' as AppTab, label: 'Pastoral Care', icon: HeartHandshake, desc: 'Confidential care cases, hospital visits & counseling' },
     { id: 'calendar' as AppTab, label: 'Events', icon: Calendar, desc: 'Service calendar & event schedules' },
     { id: 'sundayschool' as AppTab, label: 'Sunday School', icon: GraduationCap, desc: 'Children classes, memory verses & badges' },
     { id: 'whatsapp' as AppTab, label: 'WhatsApp', icon: MessageSquare, desc: 'One-click WhatsApp reminders & notices' },

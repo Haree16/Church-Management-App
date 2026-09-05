@@ -2,17 +2,12 @@ import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Visitor, UserRole } from '@/types/database';
 import { DEMO_MINISTRIES, DEMO_GROUPS, DEMO_FAMILIES } from '@/lib/mockData';
-import { UserCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ConvertVisitorDialogProps {
@@ -67,68 +62,104 @@ export function ConvertVisitorDialog({
     }
   };
 
+  const inputStyle = "bg-slate-50 border border-slate-200 text-slate-900 font-medium text-xs sm:text-sm rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 caret-emerald-600 placeholder:text-slate-400 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-200 dark:caret-emerald-600";
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 mb-2">
-              <Sparkles className="h-5 w-5" />
+      <DialogContent className="max-w-md bg-white text-slate-900 border border-slate-200 shadow-2xl p-0 overflow-hidden rounded-3xl dark:bg-white dark:text-slate-900 dark:border-slate-200">
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[90vh]">
+          {/* Header Banner */}
+          <div className="bg-slate-900 text-white p-5 flex items-center justify-between shrink-0 border-b border-slate-800">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-white">
+                  Convert Visitor to Member
+                </h2>
+                <p className="text-xs text-slate-300 font-medium">
+                  Create a Covenant Member record while preserving guest history.
+                </p>
+              </div>
             </div>
-            <DialogTitle>Convert Visitor to Church Member</DialogTitle>
-            <DialogDescription className="text-xs">
-              This will create a new Covenant Member record for <strong>{visitor.first_name} {visitor.last_name}</strong> while preserving their original visitor history and attendance timeline.
-            </DialogDescription>
-          </DialogHeader>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-          <div className="space-y-3 py-4 text-xs">
-            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-1">
-              <div className="font-semibold text-slate-900 dark:text-slate-100">
+          {/* Form Content */}
+          <div className="p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
+            <div className="rounded-2xl bg-emerald-50/70 p-3.5 border border-emerald-200/80 space-y-1">
+              <div className="font-extrabold text-slate-900 text-sm">
                 {visitor.first_name} {visitor.last_name}
               </div>
-              <div className="text-slate-500">First Visit: {visitor.visit_date} ({visitor.service_attended || 'Sunday Service'})</div>
+              <div className="text-slate-600 font-medium">First Visit: {visitor.visit_date} ({visitor.service_attended || 'Sunday Service'})</div>
               <div className="text-slate-500">Email: {visitor.email || 'Not provided'} • Phone: {visitor.phone || 'Not provided'}</div>
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">
+              <label className="font-extrabold text-slate-700 block">
                 Church Joining Date *
               </label>
               <Input
                 type="date"
                 value={joinedDate}
                 onChange={(e) => setJoinedDate(e.target.value)}
-                required
+                className={inputStyle}
               />
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">
-                Membership Role
+              <label className="font-extrabold text-slate-700 block">
+                Covenant Role *
               </label>
               <Select value={role} onValueChange={(val) => setRole(val as UserRole)}>
-                <SelectTrigger>
+                <SelectTrigger className={inputStyle}>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="volunteer">Volunteer</SelectItem>
-                  <SelectItem value="group_leader">Group Leader</SelectItem>
+                <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
+                  <SelectItem value="member">Church Member</SelectItem>
+                  <SelectItem value="group_leader">Small Group Leader</SelectItem>
                   <SelectItem value="ministry_leader">Ministry Leader</SelectItem>
+                  <SelectItem value="volunteer">Ministry Volunteer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">
-                Assign Small Group
+              <label className="font-extrabold text-slate-700 block">
+                Assign to Ministry (Optional)
               </label>
-              <Select value={groupId || 'none'} onValueChange={(val) => setGroupId(val === 'none' ? '' : val)}>
-                <SelectTrigger>
+              <Select value={ministryId} onValueChange={setMinistryId}>
+                <SelectTrigger className={inputStyle}>
+                  <SelectValue placeholder="Select ministry" />
+                </SelectTrigger>
+                <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
+                  <SelectItem value="">None / General</SelectItem>
+                  {DEMO_MINISTRIES.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-extrabold text-slate-700 block">
+                Assign to Small Group (Optional)
+              </label>
+              <Select value={groupId} onValueChange={setGroupId}>
+                <SelectTrigger className={inputStyle}>
                   <SelectValue placeholder="Select small group" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
+                <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
+                  <SelectItem value="">None / General</SelectItem>
                   {DEMO_GROUPS.map((g) => (
                     <SelectItem key={g.id} value={g.id}>
                       {g.name}
@@ -139,45 +170,36 @@ export function ConvertVisitorDialog({
             </div>
 
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">
-                Assign Ministry Department
-              </label>
-              <Select value={ministryId || 'none'} onValueChange={(val) => setMinistryId(val === 'none' ? '' : val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select ministry" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {DEMO_MINISTRIES.map((min) => (
-                    <SelectItem key={min.id} value={min.id}>
-                      {min.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">
-                Pastoral Confirmation Notes
+              <label className="font-extrabold text-slate-700 block">
+                Conversion Notes
               </label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Completed membership covenant track..."
+                placeholder="e.g. Completed new believers orientation class"
+                className={inputStyle}
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          {/* Footer Actions */}
+          <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-extrabold text-slate-600 hover:bg-slate-200 rounded-xl transition"
+            >
               Cancel
-            </Button>
-            <Button type="submit" isLoading={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
-              Complete Conversion
-            </Button>
-          </DialogFooter>
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow transition"
+            >
+              {isSubmitting ? 'Converting...' : 'Convert to Member'}
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

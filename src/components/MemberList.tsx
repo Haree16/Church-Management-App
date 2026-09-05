@@ -3,7 +3,7 @@ import { Member, MembershipStatus, MinistryRole, ChurchMinistry } from '../types
 import { 
   Search, Phone, Mail, MapPin, Users, HeartHandshake, ShieldCheck, 
   ChevronRight, Sparkles, Filter, X, UserPlus, Heart, MessageSquare, Trash2,
-  ArrowUpDown, Crown
+  ArrowUpDown, Crown, Edit3
 } from 'lucide-react';
 import { UserAvatar } from './common/UserAvatar';
 
@@ -419,6 +419,17 @@ export const MemberList: React.FC<MemberListProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditMember(member);
+                      }}
+                      className="text-slate-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition cursor-pointer"
+                      title="Edit Member"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+
                     {onDeleteMember && (
                       <button
                         onClick={(e) => {
@@ -427,7 +438,7 @@ export const MemberList: React.FC<MemberListProps> = ({
                             onDeleteMember(member.id);
                           }
                         }}
-                        className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition"
+                        className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
                         title="Delete Member"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

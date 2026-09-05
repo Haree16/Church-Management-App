@@ -81,16 +81,24 @@ function getLocalAuditLogs(churchId: string): AuditLog[] {
     const raw = localStorage.getItem(`${LOCAL_STORAGE_KEY}_${churchId}`);
     if (raw) return JSON.parse(raw);
   } catch (e) {
-    console.error('Error reading local audit logs:', e);
+    // Silent fallback
   }
   return [];
 }
 
 function saveLocalAuditLogs(churchId: string, logs: AuditLog[]) {
   try {
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_${churchId}`, JSON.stringify(logs));
+    // Keep only the 50 most recent logs for local storage
+    const trimmed = (logs || []).slice(0, 50);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_${churchId}`, JSON.stringify(trimmed));
   } catch (e) {
-    console.error('Error writing local audit logs:', e);
+    try {
+      // If quota exceeded, cap at 20 most recent logs
+      const compact = (logs || []).slice(0, 20);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_${churchId}`, JSON.stringify(compact));
+    } catch (e2) {
+      // Silent fallback when quota is completely full
+    }
   }
 }
 

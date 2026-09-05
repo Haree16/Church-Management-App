@@ -1,36 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { visitorService, CreateVisitorPayload } from '@/services/visitorService';
-import { Visitor, VisitorStatus } from '@/types/database';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState } from '@/components/ui/error-state';
-import { Skeleton } from '@/components/ui/skeleton';
-import { CanAccess } from '@/components/ui/can-access';
+import { followUpService } from '@/services/followUpService';
+import { Visitor, VisitorStatus, FollowUp } from '@/types/database';
 import { VisitorFormDialog } from '@/components/people/VisitorFormDialog';
 import { ConvertVisitorDialog } from '@/components/people/ConvertVisitorDialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { formatDate } from '@/lib/utils';
+import { DuplicatePersonCheckModal } from '@/components/people/DuplicatePersonCheckModal';
+import { Visitor360Profile } from '@/components/visitors/Visitor360Profile';
+import { VisitorPipelineWidget } from '@/components/visitors/VisitorPipelineWidget';
+import { FollowUpQueueView } from '@/components/visitors/FollowUpQueueView';
+import { VisitorDashboardView } from '@/components/visitors/VisitorDashboardView';
+import { useAuth } from '@/context/AuthContext';
 import {
   UserCheck,
   Plus,
@@ -41,24 +20,45 @@ import {
   Sparkles,
   CheckCircle2,
   Clock,
-  Heart,
   MoreVertical,
   Edit2,
   Trash2,
   UserPlus,
   AlertTriangle,
   Users,
+  LayoutGrid,
+  List,
+  BarChart2,
+  CheckSquare,
+  Filter,
+  X,
+  ChevronRight,
+  Heart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function VisitorsPage() {
-  const { activeChurch } = useAuth();
+type VisitorViewMode = 'dashboard' | 'pipeline' | 'directory' | 'followups';
+
+interface VisitorsPageProps {
+  currentChurch?: any;
+  currentUser?: any;
+}
+
+export function VisitorsPage({ currentChurch: propChurch, currentUser: propUser }: VisitorsPageProps = {}) {
+  const auth = useAuth();
+  const activeChurch = propChurch || auth?.activeChurch;
+  const user = propUser || auth?.user;
 
   const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [viewMode, setViewMode] = useState<VisitorViewMode>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Selected Visitor 360 State
+  const [selectedVisitor360, setSelectedVisitor360] = useState<Visitor | null>(null);
 
   // Dialog States
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -66,15 +66,21 @@ export function VisitorsPage() {
   const [convertingVisitor, setConvertingVisitor] = useState<Visitor | null>(null);
   const [visitorToDelete, setVisitorToDelete] = useState<Visitor | null>(null);
 
-  const loadVisitors = async () => {
+  // Duplicate Check Modal State
+  const [duplicateMatches, setDuplicateMatches] = useState<{ visitors: Visitor[]; members: any[] } | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<CreateVisitorPayload | null>(null);
+
+  const loadData = async () => {
     if (!activeChurch) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await visitorService.getVisitors(activeChurch.id);
-      setVisitors(data);
+      const visitorsData = await visitorService.getVisitors(activeChurch.id);
+      const followUpsData = await followUpService.getFollowUps(activeChurch.id);
+      setVisitors(visitorsData);
+      setFollowUps(followUpsData);
     } catch (err: any) {
-      console.error('Failed to load visitors:', err);
+      console.error('Failed to load visitor data:', err);
       setError(err.message || 'Failed to load guest records.');
     } finally {
       setIsLoading(false);
@@ -82,14 +88,37 @@ export function VisitorsPage() {
   };
 
   useEffect(() => {
-    loadVisitors();
+    loadData();
   }, [activeChurch]);
 
-  const handleCreateVisitor = async (payload: CreateVisitorPayload) => {
+  const handleCreateVisitorRequest = async (payload: CreateVisitorPayload) => {
+    if (!activeChurch) return;
+
+    // Perform duplicate check
+    const matches = await visitorService.checkPossibleDuplicates(activeChurch.id, {
+      phone: payload.phone,
+      email: payload.email,
+      first_name: payload.first_name,
+      last_name: payload.last_name,
+    });
+
+    if (matches.visitors.length > 0 || matches.members.length > 0) {
+      setPendingPayload(payload);
+      setDuplicateMatches(matches);
+      return;
+    }
+
+    await proceedWithVisitorCreation(payload);
+  };
+
+  const proceedWithVisitorCreation = async (payload: CreateVisitorPayload) => {
     if (!activeChurch) return;
     const created = await visitorService.createVisitor(activeChurch.id, payload);
     setVisitors((prev) => [created, ...prev]);
-    toast.success(`First-time guest "${payload.first_name} ${payload.last_name}" recorded!`);
+    toast.success(`Sunday Guest "${payload.first_name} ${payload.last_name}" recorded successfully!`);
+    setDuplicateMatches(null);
+    setPendingPayload(null);
+    loadData();
   };
 
   const handleUpdateVisitor = async (payload: CreateVisitorPayload) => {
@@ -98,12 +127,28 @@ export function VisitorsPage() {
     setVisitors((prev) => prev.map((v) => (v.id === editingVisitor.id ? updated : v)));
     toast.success('Visitor record updated.');
     setEditingVisitor(null);
+    if (selectedVisitor360?.id === editingVisitor.id) {
+      setSelectedVisitor360(updated);
+    }
+  };
+
+  const handleStatusChange = async (visitorId: string, newStatus: VisitorStatus) => {
+    if (!activeChurch) return;
+    try {
+      const updated = await visitorService.updateVisitor(activeChurch.id, visitorId, { status: newStatus });
+      setVisitors((prev) => prev.map((v) => (v.id === visitorId ? updated : v)));
+      toast.success(`Visitor stage updated to ${newStatus.replace(/_/g, ' ')}`);
+    } catch (err) {
+      toast.error('Failed to update stage.');
+    }
   };
 
   const handleConvertVisitor = async (visitorId: string, memberPayload: any) => {
     if (!activeChurch) return;
     await visitorService.convertVisitorToMember(activeChurch.id, visitorId, memberPayload);
-    await loadVisitors();
+    toast.success('Visitor successfully converted to Member!');
+    setConvertingVisitor(null);
+    loadData();
   };
 
   const handleDeleteConfirm = async () => {
@@ -127,324 +172,349 @@ export function VisitorsPage() {
       const term = searchTerm.toLowerCase();
 
       const matchesSearch = term === '' || name.includes(term) || email.includes(term) || phone.includes(term);
-      const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+      const matchesStatus = statusFilter === 'ALL' || v.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [visitors, searchTerm, statusFilter]);
 
-  // Statistics
-  const totalGuests = visitors.length;
-  const followUpRequired = visitors.filter((v) => v.status === 'follow_up_required').length;
-  const connectedGuests = visitors.filter((v) => v.status === 'connected').length;
-  const becameMembers = visitors.filter((v) => v.status === 'became_member').length;
-
   const getStatusBadge = (status: VisitorStatus) => {
     switch (status) {
       case 'new':
-        return <Badge variant="default">New Guest</Badge>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">New Guest</span>;
+      case 'contact_pending':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">Contact Pending</span>;
       case 'contacted':
-        return <Badge variant="secondary">Contacted</Badge>;
-      case 'follow_up_required':
-        return <Badge variant="amber">Follow-up Required</Badge>;
-      case 'connected':
-        return <Badge variant="blue">Connected</Badge>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">Contacted</span>;
+      case 'follow_up_scheduled':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">Follow-up Scheduled</span>;
+      case 'follow_up_completed':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">Follow-up Completed</span>;
+      case 'returned_visitor':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">Returned Visitor</span>;
+      case 'regular_attendee':
+      case 'regular_attender':
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-200">Regular Attendee</span>;
       case 'became_member':
-        return <Badge variant="emerald">Became Member</Badge>;
-      case 'not_interested':
-        return <Badge variant="outline">Not Interested</Badge>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800 border border-violet-200">Became Member</span>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">{status.replace(/_/g, ' ')}</span>;
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Visitor & Guest Integration
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Record first-time Sunday guest cards, automate pastoral follow-ups, and convert visitors into covenant members.
-          </p>
+    <div className="space-y-4">
+      {/* Top Banner Header matching ShepherdHub design */}
+      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center border border-sky-500/30 shrink-0">
+            <UserCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              Visitor Management & Follow-up
+            </h1>
+            <p className="text-xs text-slate-300 mt-0.5 max-w-xl">
+              Capture Sunday guest cards, automate pastoral care follow-ups, track return visits, and convert guests into covenant members.
+            </p>
+          </div>
         </div>
 
-        <CanAccess permission="members:create">
-          <Button
-            size="sm"
-            onClick={() => setIsAddOpen(true)}
-            className="h-9 gap-1.5 bg-sky-600 hover:bg-sky-700 text-white"
+        <button
+          onClick={() => setIsAddOpen(true)}
+          className="px-4 py-2.5 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 shrink-0"
+        >
+          <UserPlus className="w-4 h-4 shrink-0" />
+          <span>+ Record Sunday Guest</span>
+        </button>
+      </div>
+
+      {/* Main View Switcher Tabs matching ShepherdHub modules */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none max-w-full pb-0.5">
+          <button
+            onClick={() => setViewMode('dashboard')}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap shrink-0 ${
+              viewMode === 'dashboard'
+                ? 'bg-slate-900 text-sky-400 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
           >
-            <UserPlus className="h-4 w-4" />
-            Record Sunday Guest
-          </Button>
-        </CanAccess>
-      </div>
+            <BarChart2 className="w-4 h-4 shrink-0" />
+            <span>Dashboard & Analytics</span>
+          </button>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-xs text-slate-500 font-medium">Total Guests Logged</p>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">{totalGuests}</span>
-            <span className="text-xs text-slate-400">visitors</span>
-          </div>
-        </Card>
+          <button
+            onClick={() => setViewMode('pipeline')}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap shrink-0 ${
+              viewMode === 'pipeline'
+                ? 'bg-slate-900 text-sky-400 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 shrink-0" />
+            <span>Stage Pipeline</span>
+          </button>
 
-        <Card className="p-4">
-          <p className="text-xs text-slate-500 font-medium">Follow-up Required</p>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-bold font-mono text-amber-600">{followUpRequired}</span>
-            <span className="text-xs text-amber-600 font-semibold">pending tasks</span>
-          </div>
-        </Card>
+          <button
+            onClick={() => setViewMode('directory')}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap shrink-0 ${
+              viewMode === 'directory'
+                ? 'bg-slate-900 text-sky-400 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <List className="w-4 h-4 shrink-0" />
+            <span>Guest Directory ({visitors.length})</span>
+          </button>
 
-        <Card className="p-4">
-          <p className="text-xs text-slate-500 font-medium">Connected to Groups</p>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-bold font-mono text-sky-600">{connectedGuests}</span>
-            <span className="text-xs text-sky-600 font-semibold">in fellowship</span>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <p className="text-xs text-slate-500 font-medium">Became Covenant Members</p>
-          <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-bold font-mono text-emerald-600">{becameMembers}</span>
-            <span className="text-xs text-emerald-600 font-semibold">converted</span>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filters Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 items-center gap-2">
-          <div className="w-full sm:max-w-xs">
-            <Input
-              placeholder="Search visitor by name, email, or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              icon={<Search className="h-4 w-4" />}
-              className="h-9 text-xs"
-            />
-          </div>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-44 h-9 text-xs">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="new">New Guest</SelectItem>
-              <SelectItem value="contacted">Contacted</SelectItem>
-              <SelectItem value="follow_up_required">Follow-up Required</SelectItem>
-              <SelectItem value="connected">Connected</SelectItem>
-              <SelectItem value="became_member">Became Member</SelectItem>
-              <SelectItem value="not_interested">Not Interested</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="text-xs text-slate-500">
-          Showing <span className="font-semibold text-slate-900 dark:text-slate-100">{filteredVisitors.length}</span> guests
+          <button
+            onClick={() => setViewMode('followups')}
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 whitespace-nowrap shrink-0 ${
+              viewMode === 'followups'
+                ? 'bg-slate-900 text-sky-400 shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <CheckSquare className="w-4 h-4 shrink-0" />
+            <span>Follow-ups Queue ({followUps.length})</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Table */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((n) => (
-            <Skeleton key={n} className="h-16 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : error ? (
-        <ErrorState message={error} onRetry={loadVisitors} />
-      ) : filteredVisitors.length === 0 ? (
-        <EmptyState
-          icon={<UserCheck className="h-10 w-10 text-sky-600" />}
-          title="No visitor records found"
-          description="Record first-time Sunday visitors to start their integration journey."
-          actionLabel="Record Sunday Guest"
-          onAction={() => setIsAddOpen(true)}
+      {/* Render Active View */}
+      {viewMode === 'dashboard' && (
+        <VisitorDashboardView
+          visitors={visitors}
+          followUps={followUps}
+          onSelectVisitor={(v) => setSelectedVisitor360(v)}
+          onOpenAddVisitor={() => setIsAddOpen(true)}
         />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Guest Name</TableHead>
-              <TableHead>Visit Details</TableHead>
-              <TableHead>Contact Info</TableHead>
-              <TableHead>Prayer Request / Notes</TableHead>
-              <TableHead>Assigned Leader</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredVisitors.map((v) => (
-              <TableRow key={v.id}>
-                {/* Name */}
-                <TableCell>
-                  <div className="font-semibold text-slate-900 dark:text-slate-100">
-                    {v.first_name} {v.last_name}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Party Size: {v.family_size} {v.family_size === 1 ? 'person' : 'people'}
-                  </div>
-                </TableCell>
-
-                {/* Visit Details */}
-                <TableCell>
-                  <div className="space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                    <div className="font-medium text-slate-800 dark:text-slate-200">
-                      {formatDate(v.visit_date)}
-                    </div>
-                    <div className="text-[11px] text-slate-500 truncate max-w-[150px]">
-                      {v.service_attended}
-                    </div>
-                    {v.invited_by && (
-                      <div className="text-[10px] text-sky-600">Invited by: {v.invited_by}</div>
-                    )}
-                  </div>
-                </TableCell>
-
-                {/* Contact */}
-                <TableCell>
-                  <div className="space-y-0.5 text-xs text-slate-600 dark:text-slate-400">
-                    {v.email && (
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-3 w-3 text-slate-400" />
-                        <span className="truncate max-w-[140px]">{v.email}</span>
-                      </div>
-                    )}
-                    {v.phone && (
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-3 w-3 text-slate-400" />
-                        <span>{v.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-
-                {/* Prayer / Notes */}
-                <TableCell className="max-w-[200px]">
-                  {v.prayer_request ? (
-                    <div className="flex items-start gap-1.5 text-xs text-rose-700 dark:text-rose-400">
-                      <Heart className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <p className="line-clamp-2 text-[11px]">{v.prayer_request}</p>
-                    </div>
-                  ) : v.notes ? (
-                    <p className="line-clamp-2 text-[11px] text-slate-500">{v.notes}</p>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">No notes</span>
-                  )}
-                </TableCell>
-
-                {/* Leader */}
-                <TableCell className="text-xs text-slate-600 dark:text-slate-400">
-                  {v.assigned_leader?.display_name || 'Unassigned'}
-                </TableCell>
-
-                {/* Status */}
-                <TableCell>{getStatusBadge(v.status)}</TableCell>
-
-                {/* Actions */}
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {v.status !== 'became_member' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setConvertingVisitor(v)}
-                        className="h-7 px-2 text-[11px] gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200"
-                      >
-                        <Sparkles className="h-3 w-3" />
-                        Convert to Member
-                      </Button>
-                    )}
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <MoreVertical className="h-4 w-4 text-slate-500" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44 text-xs">
-                        <DropdownMenuLabel>Guest Options</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setEditingVisitor(v)}>
-                          <Edit2 className="mr-2 h-3.5 w-3.5" />
-                          Edit Guest Card
-                        </DropdownMenuItem>
-
-                        {v.status !== 'became_member' && (
-                          <DropdownMenuItem onClick={() => setConvertingVisitor(v)}>
-                            <UserPlus className="mr-2 h-3.5 w-3.5 text-emerald-600" />
-                            Convert to Member
-                          </DropdownMenuItem>
-                        )}
-
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setVisitorToDelete(v)}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-2 h-3.5 w-3.5" />
-                          Delete Record
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
       )}
 
-      {/* Visitor Add/Edit Dialog */}
-      <VisitorFormDialog
-        isOpen={isAddOpen || !!editingVisitor}
-        onClose={() => {
-          setIsAddOpen(false);
-          setEditingVisitor(null);
-        }}
-        onSave={editingVisitor ? handleUpdateVisitor : handleCreateVisitor}
-        initialData={editingVisitor}
-        mode={editingVisitor ? 'edit' : 'create'}
-      />
+      {viewMode === 'pipeline' && (
+        <VisitorPipelineWidget
+          visitors={visitors}
+          onSelectVisitor={(v) => setSelectedVisitor360(v)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
 
-      {/* Convert Visitor to Member Dialog */}
-      <ConvertVisitorDialog
-        isOpen={!!convertingVisitor}
-        onClose={() => setConvertingVisitor(null)}
-        visitor={convertingVisitor}
-        onConvert={handleConvertVisitor}
-      />
+      {viewMode === 'followups' && (
+        <FollowUpQueueView
+          churchId={activeChurch?.id || ''}
+          currentUserId={user?.id}
+          onSelectVisitor={(visitorId) => {
+            const v = visitors.find((x) => x.id === visitorId);
+            if (v) setSelectedVisitor360(v);
+          }}
+        />
+      )}
 
-      {/* Delete Visitor Dialog */}
-      <Dialog open={!!visitorToDelete} onOpenChange={(open) => !open && setVisitorToDelete(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 mb-2">
-              <AlertTriangle className="h-5 w-5" />
+      {viewMode === 'directory' && (
+        <div className="space-y-4">
+          {/* Search & Action Bar */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-2.5">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search by visitor name, phone, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            <DialogTitle>Delete Visitor Record</DialogTitle>
-            <DialogDescription className="text-xs">
-              Are you sure you want to remove the guest record for <strong>{visitorToDelete?.first_name} {visitorToDelete?.last_name}</strong>?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setVisitorToDelete(null)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Delete Guest Record
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+            {/* Filter Pills */}
+            <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar scrollbar-none text-xs -mx-0.5 px-0.5">
+              <span className="text-slate-400 font-medium px-1 flex items-center gap-1 shrink-0">
+                <Filter className="w-3 h-3" /> Stage:
+              </span>
+              {[
+                { key: 'ALL', label: 'All Guests' },
+                { key: 'new', label: 'New Guest' },
+                { key: 'contact_pending', label: 'Contact Pending' },
+                { key: 'contacted', label: 'Contacted' },
+                { key: 'follow_up_scheduled', label: 'Follow-up Scheduled' },
+                { key: 'returned_visitor', label: 'Returned Visitor' },
+                { key: 'became_member', label: 'Became Member' },
+              ].map((st) => (
+                <button
+                  key={st.key}
+                  onClick={() => setStatusFilter(st.key)}
+                  className={`px-2.5 py-1 rounded-lg border font-medium shrink-0 transition ${
+                    statusFilter === st.key
+                      ? 'bg-slate-900 text-sky-400 border-slate-900 shadow-sm font-extrabold'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Directory Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>
+                Showing <strong className="text-slate-900">{filteredVisitors.length}</strong> of{' '}
+                <strong className="text-slate-900">{visitors.length}</strong> recorded guest cards
+              </span>
+            </div>
+
+            {isLoading ? (
+              <div className="p-8 text-center text-slate-400 text-xs font-semibold">Loading guest records...</div>
+            ) : filteredVisitors.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 text-sm space-y-3">
+                <UserCheck className="w-12 h-12 text-slate-300 mx-auto" />
+                <p className="font-semibold text-slate-700">No visitors found.</p>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  {searchTerm || statusFilter !== 'ALL'
+                    ? 'No visitor records match your selected search or filters.'
+                    : 'Get started by recording your first Sunday guest connection!'}
+                </p>
+                <button
+                  onClick={() => setIsAddOpen(true)}
+                  className="px-4 py-2 bg-sky-600 text-white font-extrabold text-xs rounded-xl shadow hover:bg-sky-700 transition"
+                >
+                  + Add Visitor Card
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredVisitors.map((v) => (
+                  <div
+                    key={v.id}
+                    onClick={() => setSelectedVisitor360(v)}
+                    className="p-4 hover:bg-slate-50/80 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 text-white font-bold text-base flex items-center justify-center shadow-sm shrink-0">
+                        {v.first_name?.[0]}
+                        {v.last_name?.[0]}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-slate-900 text-sm">
+                            {v.first_name} {v.last_name}
+                          </span>
+                          {getStatusBadge(v.status)}
+                          {(v.visit_count || 1) > 1 && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                              🔁 {v.visit_count} Visits
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
+                          {v.phone && <span>📞 {v.phone}</span>}
+                          {v.email && <span>✉️ {v.email}</span>}
+                          <span>📅 First visit: {v.first_visit_date || v.visit_date}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setSelectedVisitor360(v)}
+                        className="px-3 py-1.5 text-xs font-extrabold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl transition"
+                      >
+                        View 360° Profile
+                      </button>
+
+                      {v.status !== 'became_member' && (
+                        <button
+                          onClick={() => setConvertingVisitor(v)}
+                          className="px-3 py-1.5 text-xs font-extrabold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition flex items-center gap-1"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" /> Convert
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Visitor 360° Modal */}
+      {selectedVisitor360 && (
+        <Visitor360Profile
+          visitor={selectedVisitor360}
+          isOpen={!!selectedVisitor360}
+          onClose={() => setSelectedVisitor360(null)}
+          onUpdate={loadData}
+          onConvert={(v) => {
+            setSelectedVisitor360(null);
+            setConvertingVisitor(v);
+          }}
+          onEdit={(v) => {
+            setSelectedVisitor360(null);
+            setEditingVisitor(v);
+          }}
+        />
+      )}
+
+      {/* Add Guest Dialog */}
+      <VisitorFormDialog
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSave={handleCreateVisitorRequest}
+        mode="create"
+      />
+
+      {/* Edit Guest Dialog */}
+      {editingVisitor && (
+        <VisitorFormDialog
+          isOpen={!!editingVisitor}
+          onClose={() => setEditingVisitor(null)}
+          onSave={handleUpdateVisitor}
+          initialData={editingVisitor}
+          mode="edit"
+        />
+      )}
+
+      {/* Convert Visitor Dialog */}
+      {convertingVisitor && (
+        <ConvertVisitorDialog
+          isOpen={!!convertingVisitor}
+          onClose={() => setConvertingVisitor(null)}
+          visitor={convertingVisitor}
+          onConvert={handleConvertVisitor}
+        />
+      )}
+
+      {/* Duplicate Check Modal */}
+      {duplicateMatches && (
+        <DuplicatePersonCheckModal
+          isOpen={!!duplicateMatches}
+          onClose={() => {
+            setDuplicateMatches(null);
+            setPendingPayload(null);
+          }}
+          duplicates={duplicateMatches}
+          onProceedAnyway={() => {
+            if (pendingPayload) proceedWithVisitorCreation(pendingPayload);
+          }}
+          onSelectExistingVisitor={(v) => {
+            setDuplicateMatches(null);
+            setPendingPayload(null);
+            setIsAddOpen(false);
+            setSelectedVisitor360(v);
+          }}
+        />
+      )}
     </div>
   );
 }

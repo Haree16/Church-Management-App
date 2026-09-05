@@ -29,11 +29,18 @@ export type FamilyRelationship = 'head' | 'spouse' | 'child' | 'parent' | 'other
 
 export type VisitorStatus =
   | 'new'
+  | 'contact_pending'
   | 'contacted'
   | 'follow_up_required'
+  | 'follow_up_scheduled'
+  | 'follow_up_completed'
+  | 'returned_visitor'
   | 'connected'
+  | 'regular_attender'
+  | 'regular_attendee'
   | 'became_member'
-  | 'not_interested';
+  | 'not_interested'
+  | 'inactive';
 
 export type VolunteerStatus = 'active' | 'inactive' | 'pending';
 
@@ -347,13 +354,18 @@ export interface Group {
   name: string;
   description: string | null;
   leader_id: string | null;
+  leader_name?: string | null;
   co_leader_id: string | null;
   assistant_leader_id?: string | null;
+  assistant_leader_name?: string | null;
   category?: string;
+  group_type?: string;
+  terminology?: string; // e.g. 'Small Group', 'Cell Group', 'Home Group', 'Life Group', 'Bible Study Group'
   status: OrgStatus;
   meeting_day: string | null;
   meeting_time: string | null;
   frequency: string;
+  meeting_frequency?: string;
   location: string | null;
   address: string | null;
   capacity: number | null;
@@ -366,6 +378,8 @@ export interface Group {
   ministry?: Ministry | null;
   members?: GroupMember[];
   member_count?: number;
+  meetings_count?: number;
+  average_attendance_rate?: number;
 }
 
 export interface GroupMember {
@@ -374,15 +388,66 @@ export interface GroupMember {
   group_id: string;
   user_id: string;
   member_id: string | null;
-  role: string; // Leader, Co-Leader, Host, Member
+  role: string; // Leader, Co-Leader, Host, Member, Coordinator
   status: OrgStatus;
   joined_date: string;
+  left_date?: string | null;
+  reason_left?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
   // Joined fields
   profile?: Profile;
   church_member?: ChurchMember;
+}
+
+export interface GroupMeeting {
+  id: string;
+  church_id: string;
+  group_id: string;
+  meeting_date: string;
+  start_time?: string;
+  end_time?: string;
+  topic?: string | null;
+  scripture_reference?: string | null;
+  notes?: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  created_by?: string | null;
+  created_at: string;
+  // Joined fields
+  group?: Group | null;
+  attendance_record?: GroupAttendanceRecord | null;
+}
+
+export interface GroupMemberHistory {
+  id: string;
+  church_id: string;
+  group_id: string;
+  member_id: string;
+  role: string;
+  status: string;
+  joined_date: string;
+  left_date?: string | null;
+  reason_left?: string | null;
+  created_at: string;
+  // Joined fields
+  group?: Group | null;
+  member?: ChurchMember | null;
+}
+
+export interface MinistryMemberHistory {
+  id: string;
+  church_id: string;
+  ministry_id: string;
+  member_id: string;
+  role: string;
+  status: string;
+  joined_date: string;
+  left_date?: string | null;
+  created_at: string;
+  // Joined fields
+  ministry?: Ministry | null;
+  member?: ChurchMember | null;
 }
 
 export interface Volunteer {
@@ -477,11 +542,25 @@ export interface ChurchSettings {
   updated_at: string;
 }
 
+export interface VisitorVisit {
+  id: string;
+  church_id: string;
+  visitor_id: string;
+  visit_date: string;
+  service_attended?: string | null;
+  event_id?: string | null;
+  invited_by?: string | null;
+  source?: string | null;
+  notes?: string | null;
+  created_at: string;
+}
+
 export interface Visitor {
   id: string;
   church_id: string;
   first_name: string;
   last_name: string;
+  preferred_name?: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -489,6 +568,13 @@ export interface Visitor {
   state: string | null;
   postal_code: string | null;
   visit_date: string;
+  first_visit_date?: string | null;
+  last_visit_date?: string | null;
+  visit_count?: number;
+  preferred_contact_method?: string | null;
+  preferred_contact_time?: string | null;
+  gender?: string | null;
+  dob?: string | null;
   service_attended: string | null;
   invited_by: string | null;
   heard_about: string | null;
@@ -503,6 +589,7 @@ export interface Visitor {
   updated_at: string;
   // Joined fields
   assigned_leader?: Profile | null;
+  visits?: VisitorVisit[];
 }
 
 export interface FollowUpHistory {
@@ -697,6 +784,9 @@ export interface PrayerNote {
   created_at: string;
 }
 
+export type TestimonyPermission = 'anonymous' | 'public' | 'private';
+export type PrayerModerationStatus = 'pending' | 'approved' | 'rejected';
+
 export interface PrayerRequest {
   id: string;
   church_id: string;
@@ -716,6 +806,12 @@ export interface PrayerRequest {
   assigned_to: string | null;
   notes: string | null;
   praise_report: string | null;
+  testimony_notes?: string | null;
+  testimony_permission?: TestimonyPermission;
+  moderation_status?: PrayerModerationStatus;
+  moderated_by?: string | null;
+  moderated_at?: string | null;
+  is_anonymous?: boolean;
   prayer_count: number;
   prayed_user_ids?: string[];
   created_at: string;
@@ -725,6 +821,66 @@ export interface PrayerRequest {
   assigned_profile?: Profile | null;
   assigned_ministry?: Ministry | null;
   prayer_notes?: PrayerNote[];
+}
+
+export type PastoralCareType =
+  | 'pastoral_visit'
+  | 'counseling'
+  | 'hospital_visit'
+  | 'bereavement'
+  | 'crisis'
+  | 'general_checkin';
+
+export type PastoralCareStage =
+  | 'initial_contact'
+  | 'in_progress'
+  | 'scheduled_followup'
+  | 'resolved'
+  | 'referred';
+
+export type PastoralCareConfidentiality = 'pastor_only' | 'pastoral_team' | 'care_leaders';
+
+export interface PastoralCare {
+  id: string;
+  church_id: string;
+  person_id?: string | null;
+  person_type: 'member' | 'visitor';
+  person_name: string;
+  person_email?: string | null;
+  person_phone?: string | null;
+  care_type: PastoralCareType;
+  stage: PastoralCareStage;
+  priority: FollowUpPriority;
+  assigned_to?: string | null;
+  assigned_to_name?: string | null;
+  confidentiality_level: PastoralCareConfidentiality;
+  summary: string;
+  private_notes?: string | null;
+  safeguarding_flag?: boolean;
+  safeguarding_notes?: string | null;
+  due_date?: string | null;
+  closed_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  assigned_profile?: Profile | null;
+  logs?: PastoralCareLog[];
+}
+
+export interface PastoralCareLog {
+  id: string;
+  church_id: string;
+  pastoral_care_id: string;
+  contact_date: string;
+  contact_method: ContactMethod | string;
+  notes: string;
+  author_id?: string | null;
+  author_name: string;
+  author_role?: string | null;
+  next_action?: string | null;
+  next_action_date?: string | null;
+  created_at: string;
 }
 
 export type NotificationType = 'info' | 'warning' | 'error' | 'success' | 'system';

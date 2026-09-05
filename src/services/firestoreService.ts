@@ -99,6 +99,14 @@ const SYSTEM_META_COL = 'system_meta';
 const SEED_DOC_ID = 'seed_v1';
 const LOCAL_SEEDED_KEY = 'cms_firestore_seeded_v1';
 
+function safeSetLocalStorageItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    // Ignore quota errors when setting flags
+  }
+}
+
 /**
  * Robustly seeds initial data into Firestore only once on very first launch.
  * Uses local storage flag and checks core tenant collections so user deletions are never overwritten or revived.
@@ -114,7 +122,7 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
     const seedDocRef = doc(db, SYSTEM_META_COL, SEED_DOC_ID);
     const seedSnap = await getDoc(seedDocRef).catch(() => null);
     if (seedSnap && seedSnap.exists()) {
-      localStorage.setItem(LOCAL_SEEDED_KEY, 'true');
+      safeSetLocalStorageItem(LOCAL_SEEDED_KEY, 'true');
       return;
     }
 
@@ -123,7 +131,7 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
     const userSnap = await getDocs(collection(db, USERS_COL)).catch(() => null);
 
     if ((churchSnap && !churchSnap.empty) || (userSnap && !userSnap.empty)) {
-      localStorage.setItem(LOCAL_SEEDED_KEY, 'true');
+      safeSetLocalStorageItem(LOCAL_SEEDED_KEY, 'true');
       await setDoc(seedDocRef, { seeded: true, initializedAt: new Date().toISOString() }).catch(console.warn);
       return;
     }
@@ -155,9 +163,9 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
     batch.set(seedDocRef, { seeded: true, initializedAt: new Date().toISOString() });
 
     await batch.commit().catch(console.warn);
-    localStorage.setItem(LOCAL_SEEDED_KEY, 'true');
+    safeSetLocalStorageItem(LOCAL_SEEDED_KEY, 'true');
   } catch (err) {
-    console.warn('Firestore seeding check/run:', err);
+    // Silent catch for quota exceptions
   }
 }
 
@@ -167,17 +175,12 @@ export function subscribeChurches(onUpdate: (data: ChurchTenant[]) => void): () 
     const list: ChurchTenant[] = [];
     snapshot.forEach((d) => {
       const data = d.data() as ChurchTenant;
-      const initMatch = INITIAL_CHURCHES.find(c => c.id === data.id);
-      if (initMatch && initMatch.logoUrl && (!data.logoUrl || data.logoUrl.includes('unsplash.com'))) {
-        data.logoUrl = initMatch.logoUrl;
-      }
       list.push(data);
     });
 
     INITIAL_CHURCHES.forEach((initChurch) => {
       if (!list.some((c) => c.id === initChurch.id)) {
         list.push(initChurch);
-        saveChurchToFirestore(initChurch).catch(console.warn);
       }
     });
 
@@ -199,35 +202,27 @@ export function subscribeChurchSettings(onUpdate: (data: Record<string, Complete
     const settingsMap: Record<string, CompleteChurchSettings> = {};
     snapshot.forEach((d) => {
       const data = d.data() as CompleteChurchSettings;
-      const defaultSettings = getDefaultChurchSettings(d.id, data?.profile?.name);
       settingsMap[d.id] = {
-        ...defaultSettings,
         ...data,
-        profile: { ...defaultSettings.profile, ...(data?.profile || {}) },
-        services: data?.services || defaultSettings.services,
-        ministries: data?.ministries || defaultSettings.ministries,
-        memberSettings: { ...defaultSettings.memberSettings, ...(data?.memberSettings || {}) },
-        attendanceSettings: { ...defaultSettings.attendanceSettings, ...(data?.attendanceSettings || {}) },
-        notificationSettings: { ...defaultSettings.notificationSettings, ...(data?.notificationSettings || {}) },
-        localization: { ...defaultSettings.localization, ...(data?.localization || {}) },
-        appearance: { ...defaultSettings.appearance, ...(data?.appearance || {}) },
-        security: { ...defaultSettings.security, ...(data?.security || {}) },
-        preferences: { 
-          ...defaultSettings.preferences, 
-          ...(data?.preferences || {}),
-          moduleToggles: {
-            ...defaultSettings.preferences.moduleToggles,
-            ...(data?.preferences?.moduleToggles || {})
-          }
-        },
+        id: data?.id || d.id,
+        church_id: data?.church_id || d.id,
+        profile: { ...(data?.profile || {}) },
+        services: data?.services || [],
+        ministries: data?.ministries || [],
+        memberSettings: data?.memberSettings || {},
+        attendanceSettings: data?.attendanceSettings || {},
+        notificationSettings: data?.notificationSettings || {},
+        localization: data?.localization || {},
+        appearance: data?.appearance || {},
+        security: data?.security || {},
+        preferences: data?.preferences || { moduleToggles: {} },
       };
     });
 
-    // Ensure all initial churches have settings in local state
+    // Ensure all initial churches have fallback settings in local state without auto-pushing mock data to cloud
     Object.entries(INITIAL_CHURCH_SETTINGS).forEach(([churchId, initSettings]) => {
       if (!settingsMap[churchId]) {
         settingsMap[churchId] = initSettings;
-        saveChurchSettingsToFirestore(initSettings).catch(console.warn);
       }
     });
 
@@ -297,11 +292,10 @@ export function subscribeUsers(onUpdate: (data: SaaSUser[]) => void): () => void
       list.push(u);
     });
 
-    // Ensure superadmin always exists
+    // Ensure superadmin always exists in local state
     INITIAL_SAAS_USERS.forEach((initUser) => {
       if (!list.some((u) => u.username.toLowerCase() === initUser.username.toLowerCase())) {
         list.unshift(initUser);
-        saveUserToFirestore(initUser).catch(console.warn);
       }
     });
 

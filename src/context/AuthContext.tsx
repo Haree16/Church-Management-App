@@ -413,6 +413,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (activeChurch?.id === id) {
         setActiveChurch(updated);
+        localStorage.setItem(LOCAL_STORAGE_ACTIVE_CHURCH_KEY, updated.id);
       }
       return updated;
     } finally {
@@ -460,10 +461,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
+const DEFAULT_AUTH_CONTEXT: AuthContextType = {
+  user: null,
+  profile: null,
+  activeChurch: null,
+  currentRole: null,
+  churchMember: null,
+  availableChurches: [],
+  isLoading: false,
+  isAuthenticated: false,
+  isDemoMode: false,
+  login: async () => ({ success: false }),
+  logout: async () => {},
+  forgotPassword: async () => ({ success: false }),
+  resetPassword: async () => ({ success: false }),
+  switchRole: () => {},
+  switchChurch: () => {},
+  createChurch: async () => ({} as any),
+  updateChurch: async () => ({} as any),
+  setDemoUser: () => {},
+  refreshUserData: async () => {},
+};
+
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return context || DEFAULT_AUTH_CONTEXT;
 }

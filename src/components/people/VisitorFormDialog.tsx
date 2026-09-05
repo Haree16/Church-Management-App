@@ -2,18 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Visitor, VisitorStatus, Profile } from '@/types/database';
+import { Visitor, VisitorStatus } from '@/types/database';
 import { CreateVisitorPayload } from '@/services/visitorService';
 import { DEMO_USERS, DEMO_SETTINGS } from '@/lib/mockData';
-import { UserCheck, Phone, Mail, MapPin, Calendar, Heart, MessageSquare, Sparkles } from 'lucide-react';
+import { UserCheck, Phone, Mail, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface VisitorFormDialogProps {
@@ -138,60 +134,78 @@ export function VisitorFormDialog({
     }
   };
 
+  const inputStyle = "bg-slate-50 border border-slate-200 text-slate-900 font-medium text-xs sm:text-sm rounded-xl focus:bg-white focus:ring-2 focus:ring-sky-500 focus:border-sky-500 caret-sky-600 placeholder:text-slate-400 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-200 dark:caret-sky-600";
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-sky-600" />
-              {mode === 'create' ? 'Record Sunday Guest Connection' : 'Edit Visitor Record'}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Log connection card details and automate follow-up workflows for first-time visitors.
-            </DialogDescription>
-          </DialogHeader>
+      <DialogContent className="max-w-2xl bg-white text-slate-900 border border-slate-200 shadow-2xl p-0 overflow-hidden rounded-3xl dark:bg-white dark:text-slate-900 dark:border-slate-200">
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[90vh]">
+          {/* Header Banner */}
+          <div className="bg-slate-900 text-white p-5 flex items-center justify-between shrink-0 border-b border-slate-800">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center border border-sky-500/30 shrink-0">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-white">
+                  {mode === 'create' ? 'Record Sunday Guest Connection' : 'Edit Visitor Record'}
+                </h2>
+                <p className="text-xs text-slate-300 font-medium">
+                  Log connection card details and automate follow-up workflows for first-time visitors.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-          <div className="space-y-4 py-4">
+          {/* Form Content */}
+          <div className="p-5 space-y-4 overflow-y-auto flex-1">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   First Name *
                 </label>
                 <Input
                   value={formData.first_name}
                   onChange={(e) => handleChange('first_name', e.target.value)}
                   placeholder="e.g. Michael"
-                  className={errors.first_name ? 'border-red-500' : ''}
+                  className={`${inputStyle} ${errors.first_name ? 'border-red-500' : ''}`}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Last Name *
                 </label>
                 <Input
                   value={formData.last_name}
                   onChange={(e) => handleChange('last_name', e.target.value)}
                   placeholder="e.g. Taylor"
-                  className={errors.last_name ? 'border-red-500' : ''}
+                  className={`${inputStyle} ${errors.last_name ? 'border-red-500' : ''}`}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Phone Number
                 </label>
                 <Input
                   value={formData.phone || ''}
                   onChange={(e) => handleChange('phone', e.target.value)}
                   placeholder="+1 (555) 000-0000"
-                  icon={<Phone className="h-4 w-4" />}
+                  icon={<Phone className="h-4 w-4 text-slate-400" />}
+                  className={inputStyle}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Email Address
                 </label>
                 <Input
@@ -199,33 +213,35 @@ export function VisitorFormDialog({
                   value={formData.email || ''}
                   onChange={(e) => handleChange('email', e.target.value)}
                   placeholder="michael@example.com"
-                  icon={<Mail className="h-4 w-4" />}
+                  icon={<Mail className="h-4 w-4 text-slate-400" />}
+                  className={inputStyle}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Visit Date *
                 </label>
                 <Input
                   type="date"
                   value={formData.visit_date}
                   onChange={(e) => handleChange('visit_date', e.target.value)}
+                  className={inputStyle}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Service Attended
                 </label>
                 <Select
                   value={formData.service_attended || 'default'}
                   onValueChange={(val) => handleChange('service_attended', val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputStyle}>
                     <SelectValue placeholder="Select service" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
                     {DEMO_SETTINGS.service_timings.map((st) => (
                       <SelectItem key={st.id} value={`${st.name} (${st.time})`}>
                         {st.name} ({st.time})
@@ -236,17 +252,17 @@ export function VisitorFormDialog({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   How Did They Hear About Us?
                 </label>
                 <Select
                   value={formData.heard_about || 'Friend / Family'}
                   onValueChange={(val) => handleChange('heard_about', val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputStyle}>
                     <SelectValue placeholder="Select source" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
                     <SelectItem value="Friend / Family">Friend or Family</SelectItem>
                     <SelectItem value="Social Media / Instagram">Social Media / Instagram / FB</SelectItem>
                     <SelectItem value="Church Website / Google Search">Google / Website</SelectItem>
@@ -258,18 +274,19 @@ export function VisitorFormDialog({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Invited By (Member Name)
                 </label>
                 <Input
                   value={formData.invited_by || ''}
                   onChange={(e) => handleChange('invited_by', e.target.value)}
                   placeholder="e.g. Sarah Jenkins"
+                  className={inputStyle}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Family / Party Size
                 </label>
                 <Input
@@ -278,43 +295,45 @@ export function VisitorFormDialog({
                   max="20"
                   value={formData.family_size || 1}
                   onChange={(e) => handleChange('family_size', parseInt(e.target.value) || 1)}
+                  className={inputStyle}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Follow-up Status
                 </label>
                 <Select
                   value={formData.status || 'new'}
                   onValueChange={(val) => handleChange('status', val as VisitorStatus)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputStyle}>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">New</SelectItem>
+                  <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
+                    <SelectItem value="new">New Guest</SelectItem>
+                    <SelectItem value="contact_pending">Contact Pending</SelectItem>
                     <SelectItem value="contacted">Contacted</SelectItem>
-                    <SelectItem value="follow_up_required">Follow-up Required</SelectItem>
-                    <SelectItem value="connected">Connected</SelectItem>
+                    <SelectItem value="follow_up_scheduled">Follow-up Scheduled</SelectItem>
+                    <SelectItem value="follow_up_completed">Follow-up Completed</SelectItem>
+                    <SelectItem value="returned_visitor">Returned Visitor</SelectItem>
                     <SelectItem value="became_member">Became Member</SelectItem>
-                    <SelectItem value="not_interested">Not Interested</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Assigned Pastoral Leader
                 </label>
                 <Select
                   value={formData.assigned_to || 'none'}
                   onValueChange={(val) => handleChange('assigned_to', val === 'none' ? undefined : val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={inputStyle}>
                     <SelectValue placeholder="Select leader for follow-up" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-slate-900 border border-slate-200 shadow-xl">
                     <SelectItem value="none">None / Unassigned</SelectItem>
                     {DEMO_USERS.filter((u) => u.role !== 'member').map((u) => (
                       <SelectItem key={u.id} value={u.id}>
@@ -326,7 +345,7 @@ export function VisitorFormDialog({
               </div>
 
               <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Prayer Request (From Guest Card)
                 </label>
                 <textarea
@@ -334,26 +353,27 @@ export function VisitorFormDialog({
                   onChange={(e) => handleChange('prayer_request', e.target.value)}
                   placeholder="Enter any prayer requests or spiritual questions submitted on the card..."
                   rows={2}
-                  className="w-full rounded-md border border-slate-200 bg-transparent p-2 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-slate-800"
+                  className={`w-full p-2.5 ${inputStyle}`}
                 />
               </div>
 
               <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label className="text-xs font-extrabold text-slate-700 block dark:text-slate-800">
                   Staff Notes & Observations
                 </label>
                 <Input
                   value={formData.notes || ''}
                   onChange={(e) => handleChange('notes', e.target.value)}
                   placeholder="e.g. Interested in young adults small groups and children's church."
+                  className={inputStyle}
                 />
               </div>
             </div>
 
             {/* Automated Follow-up Trigger */}
             {mode === 'create' && (
-              <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs dark:border-sky-900/60 dark:bg-sky-950/20">
-                <label className="flex items-center gap-2 font-semibold text-sky-950 dark:text-sky-200 cursor-pointer">
+              <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5 text-xs">
+                <label className="flex items-center gap-2 font-extrabold text-sky-950 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.create_follow_up}
@@ -363,22 +383,22 @@ export function VisitorFormDialog({
                   <span>Automatically generate Follow-up Task for pastoral team</span>
                 </label>
                 {formData.create_follow_up && (
-                  <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 pt-2 border-t border-sky-200/60 dark:border-sky-900/40">
+                  <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 pt-2 border-t border-sky-200/60">
                     <div className="space-y-1">
-                      <span className="text-[10px] text-slate-500">Task Title</span>
+                      <span className="text-[10px] text-slate-500 font-semibold">Task Title</span>
                       <Input
                         value={formData.follow_up_title || `Welcome call with ${formData.first_name || 'Guest'}`}
                         onChange={(e) => handleChange('follow_up_title', e.target.value)}
-                        className="h-7 text-xs bg-white dark:bg-slate-900"
+                        className={`h-8 ${inputStyle}`}
                       />
                     </div>
                     <div className="space-y-1">
-                      <span className="text-[10px] text-slate-500">Due Date</span>
+                      <span className="text-[10px] text-slate-500 font-semibold">Due Date</span>
                       <Input
                         type="date"
                         value={formData.follow_up_due_date || ''}
                         onChange={(e) => handleChange('follow_up_due_date', e.target.value)}
-                        className="h-7 text-xs bg-white dark:bg-slate-900"
+                        className={`h-8 ${inputStyle}`}
                       />
                     </div>
                   </div>
@@ -387,14 +407,24 @@ export function VisitorFormDialog({
             )}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          {/* Footer Actions */}
+          <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-extrabold text-slate-600 hover:bg-slate-200 rounded-xl transition"
+            >
               Cancel
-            </Button>
-            <Button type="submit" isLoading={isSubmitting}>
-              {mode === 'create' ? 'Save Guest Record' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-xs font-extrabold text-white bg-sky-600 hover:bg-sky-700 active:bg-sky-800 rounded-xl shadow transition"
+            >
+              {isSubmitting ? 'Saving...' : mode === 'create' ? 'Save Guest Record' : 'Save Changes'}
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

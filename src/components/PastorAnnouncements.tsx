@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PastorAnnouncement, SaaSUser, ChurchTenant } from '../types';
-import { Megaphone, Pin, Plus, Calendar, Sparkles, User, FileText, Share2, Volume2, X, Trash2, AlertTriangle, Edit3 } from 'lucide-react';
+import { Megaphone, Pin, Plus, Calendar, Sparkles, User, FileText, Share2, Volume2, X, Trash2, AlertTriangle, Edit3, MessageSquare, Check, Copy } from 'lucide-react';
 
 interface PastorAnnouncementsProps {
   announcements?: PastorAnnouncement[];
@@ -27,6 +27,24 @@ export const PastorAnnouncements: React.FC<PastorAnnouncementsProps> = ({
   const [isPinned, setIsPinned] = useState(false);
 
   const safeAnnouncements = announcements || [];
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleShareAnnouncementWhatsApp = (item: PastorAnnouncement) => {
+    const formatted = `📢 *${currentChurch?.name || 'Church'} - ${item.title}*\n\n` +
+      `📅 *Date:* ${item.date}\n` +
+      `🏷️ *Category:* ${item.category}\n` +
+      `👤 *From:* ${item.authorName}\n\n` +
+      `${item.content}\n\n` +
+      `_Blessings,\n*${currentChurch?.name || 'Church'} Leadership*_`;
+
+    navigator.clipboard.writeText(formatted);
+    setCopiedId(item.id);
+    setTimeout(() => setCopiedId(null), 2500);
+
+    const encoded = encodeURIComponent(formatted);
+    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+  };
+
 
   const handleOpenAdd = () => {
     setEditingAnnouncement(null);
@@ -145,6 +163,16 @@ export const PastorAnnouncements: React.FC<PastorAnnouncementsProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleShareAnnouncementWhatsApp(item)}
+                  className="px-2.5 py-1.5 rounded-lg text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition flex items-center gap-1.5 text-xs font-bold"
+                  title="Share announcement to WhatsApp"
+                >
+                  {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />}
+                  <span>{copiedId === item.id ? 'Copied & Shared!' : 'WhatsApp'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => handleOpenEdit(item)}

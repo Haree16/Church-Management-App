@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Member, AttendanceRecord, SaaSUser, CompleteChurchSettings } from '../types';
-import { Users, Calendar, CheckCircle2, Circle, UserCheck, Plus, Sparkles, Clock, BarChart3, Save, Trash2 } from 'lucide-react';
+import { Member, AttendanceRecord, SaaSUser, CompleteChurchSettings, WhatsAppGroup } from '../types';
+import { Users, Calendar, CheckCircle2, Circle, UserCheck, Plus, Sparkles, Clock, BarChart3, Save, Trash2, MessageSquare, Send, Copy, Check, X, HeartHandshake, ExternalLink } from 'lucide-react';
 import { UserAvatar } from './common/UserAvatar';
 
 interface AttendanceTrackerProps {
@@ -8,6 +8,7 @@ interface AttendanceTrackerProps {
   attendanceRecords?: AttendanceRecord[];
   currentUser?: SaaSUser;
   churchSettings?: CompleteChurchSettings;
+  groups?: WhatsAppGroup[];
   onSaveRecord: (record: AttendanceRecord) => void;
   onDeleteRecord?: (id: string) => void;
 }
@@ -17,9 +18,17 @@ export const AttendanceTracker: React.FC<AttendanceTrackerProps> = ({
   attendanceRecords = [],
   currentUser,
   churchSettings,
+  groups = [],
   onSaveRecord,
   onDeleteRecord,
 }) => {
+  const safeGroups = groups || [];
+  const [isServiceWhatsAppModalOpen, setIsServiceWhatsAppModalOpen] = useState(false);
+  const [serviceSummaryRecord, setServiceSummaryRecord] = useState<AttendanceRecord | null>(null);
+  const [serviceSummaryMode, setServiceSummaryMode] = useState<'leadership_summary' | 'absentee_care'>('leadership_summary');
+  const [selectedServiceTargetGroupId, setSelectedServiceTargetGroupId] = useState<string>('');
+  const [serviceWhatsAppText, setServiceWhatsAppText] = useState('');
+  const [serviceCopied, setServiceCopied] = useState(false);
   const customServices = (churchSettings?.services || []).filter(s => s.isActive !== false).map(s => s.name);
   const fallbackServices = [
     'Sunday First Service (9:00 AM)',
@@ -70,6 +79,64 @@ export const AttendanceTracker: React.FC<AttendanceTrackerProps> = ({
     onSaveRecord(newRecord);
     alert(`Attendance saved successfully! Total present: ${presentIds.length + guestCount}`);
     setNotes('');
+  };
+
+
+  const generateServiceWhatsAppMessage = (record: AttendanceRecord | null, mode: 'leadership_summary' | 'absentee_care') => {
+    const sName = record?.serviceName || selectedService;
+    const sDate = record?.date 
+      ? new Date(record.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : new Date(serviceDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const pCount = record ? (record.presentMemberIds?.length || 0) : presentIds.length;
+    const gCount = record ? (record.guestCount || 0) : guestCount;
+    const total = pCount + gCount;
+    const recName = record?.recordedBy || recorderName;
+    const sNotes = record?.notes || notes;
+    const churchTitle = churchSettings?.profile?.name || 'New Creation Assembly Church';
+
+    if (mode === 'leadership_summary') {
+      return `📊 *${churchTitle} - Service Attendance Report*\n\n` +
+        `📍 *Service:* ${sName}\n` +
+        `📅 *Date:* ${sDate}\n` +
+        `👤 *Recorded By:* ${recName}\n\n` +
+        `👥 *Attendance Headcount:*\n` +
+        `• Registered Members: *${pCount}*\n` +
+        `• First-Time Visitors: *${gCount}*\n` +
+        `• Total Headcount: *${total}*\n\n` +
+        (sNotes ? `📝 *Service Notes & Highlights:* ${sNotes}\n\n` : '') +
+        `_Praise the Lord for a blessed service in His presence!_\n\n` +
+        `*${churchTitle} Administration*`;
+    } else {
+      return `Dear Church Family of *${churchTitle}*,\n\n` +
+        `Warm greetings in Christ! We missed you and your family at ${sName} on ${sDate}. You were in our prayers during service.\n\n` +
+        `If you or your family need prayer intercession, home visitation, or pastoral assistance, please reply to this message anytime.\n\n` +
+        `_“The Lord bless you and keep you; the Lord make his face shine on you and be gracious to you.” — Numbers 6:24-25_\n\n` +
+        `With prayers & blessings,\n*${churchTitle} Pastoral Care Team*`;
+    }
+  };
+
+  const handleOpenServiceWhatsAppModal = (record: AttendanceRecord | null, mode: 'leadership_summary' | 'absentee_care' = 'leadership_summary') => {
+    setServiceSummaryRecord(record);
+    setServiceSummaryMode(mode);
+    const targetGrp = safeGroups.find(g => g.category === 'Leadership' || g.category === 'General') || safeGroups[0];
+    setSelectedServiceTargetGroupId(targetGrp?.id || '');
+    const msg = generateServiceWhatsAppMessage(record, mode);
+    setServiceWhatsAppText(msg);
+    setIsServiceWhatsAppModalOpen(true);
+  };
+
+  const handleDispatchServiceWhatsApp = () => {
+    navigator.clipboard.writeText(serviceWhatsAppText);
+    setServiceCopied(true);
+    setTimeout(() => setServiceCopied(false), 3000);
+
+    const targetGroup = safeGroups.find((g) => g.id === selectedServiceTargetGroupId);
+    const encoded = encodeURIComponent(serviceWhatsAppText);
+    const targetUrl = targetGroup?.inviteLink && targetGroup.inviteLink.startsWith('http')
+      ? targetGroup.inviteLink
+      : `https://api.whatsapp.com/send?text=${encoded}`;
+
+    window.open(targetUrl, '_blank');
   };
 
   const filteredMembers = safeMembers
@@ -345,6 +412,16 @@ export const AttendanceTracker: React.FC<AttendanceTrackerProps> = ({
                         </div>
                       </div>
 
+                      <button
+                        type="button"
+                        onClick={() => handleOpenServiceWhatsAppModal(rec, 'leadership_summary')}
+                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
+                        title="Broadcast Attendance Summary on WhatsApp"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp Summary</span>
+                      </button>
+
                       {onDeleteRecord && (
                         <button
                           type="button"
@@ -367,6 +444,146 @@ export const AttendanceTracker: React.FC<AttendanceTrackerProps> = ({
           )}
         </div>
       )}
+    
+      {/* MODAL: SERVICE ATTENDANCE WHATSAPP BROADCAST */}
+      {isServiceWhatsAppModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 border border-slate-200 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    Service Attendance WhatsApp Broadcast
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Broadcast headcount recap to Church Leadership or follow-up with members
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsServiceWhatsAppModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setServiceSummaryMode('leadership_summary');
+                  setServiceWhatsAppText(generateServiceWhatsAppMessage(serviceSummaryRecord, 'leadership_summary'));
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 ${
+                  serviceSummaryMode === 'leadership_summary'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Leadership Attendance Summary</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setServiceSummaryMode('absentee_care');
+                  setServiceWhatsAppText(generateServiceWhatsAppMessage(serviceSummaryRecord, 'absentee_care'));
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 ${
+                  serviceSummaryMode === 'absentee_care'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <HeartHandshake className="w-3.5 h-3.5" />
+                <span>Absentee Care Broadcast</span>
+              </button>
+            </div>
+
+            {/* Target WhatsApp Group */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                Target Church WhatsApp Group Channel
+              </label>
+              <select
+                value={selectedServiceTargetGroupId}
+                onChange={(e) => setSelectedServiceTargetGroupId(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {safeGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.category}) — {g.memberCount || 25} Members
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Message Textarea */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">
+                  Formatted WhatsApp Message
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setServiceWhatsAppText(generateServiceWhatsAppMessage(serviceSummaryRecord, serviceSummaryMode))}
+                  className="text-[11px] font-bold text-rose-600 hover:underline"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <textarea
+                rows={8}
+                value={serviceWhatsAppText}
+                onChange={(e) => setServiceWhatsAppText(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleDispatchServiceWhatsApp}
+                className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+              >
+                <Send className="w-4 h-4" />
+                <span>Broadcast to WhatsApp Group</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(serviceWhatsAppText);
+                  setServiceCopied(true);
+                  setTimeout(() => setServiceCopied(false), 2000);
+                }}
+                className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 flex items-center justify-center gap-2 transition"
+              >
+                {serviceCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
+                <span>{serviceCopied ? 'Copied!' : 'Copy'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsServiceWhatsAppModalOpen(false)}
+                className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

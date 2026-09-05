@@ -94,7 +94,7 @@ export function DashboardPage() {
               Welcome back, {profile?.first_name || user?.email?.split('@')[0] || 'Leader'}!
             </h1>
             <p className="text-xs sm:text-sm text-sky-100/90 max-w-2xl">
-              {activeChurch?.tagline || 'Loving God, Loving People, Serving Chennai'}
+              {activeChurch?.tagline || ''}
             </p>
           </div>
 

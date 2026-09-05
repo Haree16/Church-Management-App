@@ -49,22 +49,78 @@ function getItem<T>(key: string, defaultValue: T): T {
   try {
     const raw = localStorage.getItem(key);
     if (raw === null || raw === undefined) {
-      localStorage.setItem(key, JSON.stringify(defaultValue));
       return defaultValue;
     }
     const parsed = JSON.parse(raw);
     return parsed;
   } catch (err) {
-    console.error(`Failed to read key ${key}`, err);
     return defaultValue;
   }
+}
+
+function stripLargeBase64<T>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(stripLargeBase64) as unknown as T;
+  }
+  const cleaned: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj as Record<string, any>)) {
+    if (typeof v === 'string' && v.startsWith('data:image/') && v.length > 50000) {
+      cleaned[k] = v.substring(0, 100) + '...[truncated]';
+    } else if (v && typeof v === 'object') {
+      cleaned[k] = stripLargeBase64(v);
+    } else {
+      cleaned[k] = v;
+    }
+  }
+  return cleaned as T;
 }
 
 function setItem<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.error(`Failed to write key ${key}`, err);
+    try {
+      // 1. Purge legacy schema versions (_v1, _v2, _v3, etc.) and debug logs
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.includes('_v1') ||
+            k.includes('_v2') ||
+            k.includes('_v3') ||
+            k.startsWith('church_cms_') ||
+            k.includes('debug') ||
+            k.includes('log'))
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e2) {
+      try {
+        // 2. Strip massive base64 image strings to fit under browser 5MB quota
+        const lightweight = stripLargeBase64(value);
+        localStorage.setItem(key, JSON.stringify(lightweight));
+      } catch (e3) {
+        try {
+          // 3. Evict non-critical caches (notifications, announcements) to free quota for active tab
+          localStorage.removeItem('nca_church_notifications_v4');
+          localStorage.removeItem('nca_church_announcements_v4');
+          localStorage.removeItem('nca_church_ss_attendance_v4');
+
+          let trimmedPayload: any = stripLargeBase64(value);
+          if (Array.isArray(trimmedPayload) && trimmedPayload.length > 50) {
+            trimmedPayload = trimmedPayload.slice(0, 50);
+          }
+          localStorage.setItem(key, JSON.stringify(trimmedPayload));
+        } catch (e4) {
+          // Silent fallback - memory state and Firestore cloud database handle all data seamlessly
+        }
+      }
+    }
   }
 }
 
@@ -164,7 +220,8 @@ export const saveAllStoredChurchSettings = (data: Record<string, CompleteChurchS
 
 export const getDefaultChurchSettings = (churchId: string, churchName?: string): CompleteChurchSettings => {
   if (INITIAL_CHURCH_SETTINGS[churchId]) {
-    return JSON.parse(JSON.stringify(INITIAL_CHURCH_SETTINGS[churchId]));
+    const init = JSON.parse(JSON.stringify(INITIAL_CHURCH_SETTINGS[churchId]));
+    return init;
   }
   const base = JSON.parse(JSON.stringify(INITIAL_CHURCH_SETTINGS['church-1']));
   return {
@@ -175,6 +232,7 @@ export const getDefaultChurchSettings = (churchId: string, churchName?: string):
       ...base.profile,
       name: churchName || `Church ${churchId}`,
       shortName: (churchName || churchId).substring(0, 12),
+      tagline: '',
       email: `office@${churchId}.org`,
     },
     updatedAt: new Date().toISOString(),

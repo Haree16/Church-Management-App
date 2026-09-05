@@ -22,6 +22,8 @@ import { MarkAnsweredDialog } from '@/components/prayer/MarkAnsweredDialog';
 import { AssignPrayerDialog } from '@/components/prayer/AssignPrayerDialog';
 import { FollowUpFormDialog } from '@/components/followups/FollowUpFormDialog';
 import { followUpService, CreateFollowUpPayload } from '@/services/followUpService';
+import { PastoralCareModule } from '@/components/care/PastoralCareModule';
+import { canManagePastoralCare } from '@/utils/rbac';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -393,12 +395,17 @@ export function PrayerRequestsPage() {
       <div className="space-y-3">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <TabsList className="grid grid-cols-5 w-full md:w-auto h-9">
+            <TabsList className={`grid ${canManagePastoralCare(currentRole || undefined) ? 'grid-cols-6' : 'grid-cols-5'} w-full md:w-auto h-9`}>
               <TabsTrigger value="all" className="text-xs">All ({prayers.length})</TabsTrigger>
               <TabsTrigger value="active" className="text-xs">Active ({stats.totalActive})</TabsTrigger>
               <TabsTrigger value="answered" className="text-xs">Answered ({stats.totalAnswered})</TabsTrigger>
-              <TabsTrigger value="assigned" className="text-xs">Assigned to Me ({stats.assignedToMe})</TabsTrigger>
+              <TabsTrigger value="assigned" className="text-xs">Assigned ({stats.assignedToMe})</TabsTrigger>
               <TabsTrigger value="my_requests" className="text-xs">My Requests</TabsTrigger>
+              {canManagePastoralCare(currentRole || undefined) && (
+                <TabsTrigger value="pastoral" className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                  <Lock className="w-3 h-3 mr-1" /> Pastoral Care
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <div className="flex items-center gap-1.5 self-end">
@@ -489,7 +496,9 @@ export function PrayerRequestsPage() {
       </div>
 
       {/* Main Content Area */}
-      {isLoading ? (
+      {activeTab === 'pastoral' ? (
+        <PastoralCareModule />
+      ) : isLoading ? (
         <div className="p-12 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
           <RefreshCw className="h-4 w-4 animate-spin text-rose-600" />
           Loading prayer requests...
